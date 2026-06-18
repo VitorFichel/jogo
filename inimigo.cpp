@@ -1,4 +1,5 @@
 #include "inimigo.h"
+#include "gamestate.h"
 #include "camera.h"
 #include "maze.h"
 #include <GL/glut.h>
@@ -29,6 +30,11 @@ void enemyInit() {
 // BFS em grid: acha o primeiro passo do caminho mais curto até a célula do player
 static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
                          int &outRow, int &outCol) {
+  // proteção: goal (ou start) fora do grid não pode ser indexado
+  if (startRow < 0 || startRow >= LAB_H || startCol < 0 || startCol >= LAB_W ||
+      goalRow < 0 || goalRow >= LAB_H || goalCol < 0 || goalCol >= LAB_W)
+    return false;
+
   if (startRow == goalRow && startCol == goalCol)
     return false;
 
@@ -88,6 +94,15 @@ static void recalcPath() {
   int playerCol = (int)(px / CELL_SIZE);
   int playerRow = (int)(pz / CELL_SIZE);
 
+  // mesma célula do grid: BFS não dá próximo passo (já "chegou"),
+  // então persegue direto em linha reta até a posição exata do player
+  if (enemyRow == playerRow && enemyCol == playerCol) {
+    targetX = px;
+    targetZ = pz;
+    hasTarget = true;
+    return;
+  }
+
   int nextRow, nextCol;
   if (bfsNextStep(enemyRow, enemyCol, playerRow, playerCol, nextRow, nextCol)) {
     targetX = (nextCol + 0.5f) * CELL_SIZE;
@@ -104,10 +119,15 @@ void enemyUpdate() {
   float deltaSeconds = (now - lastUpdateTime) / 1000.0f;
   lastUpdateTime = now;
 
-  // proteção: se o jogo travou um instante (ex: troca de janela), não deixa
-  // o inimigo "teleportar" por causa de um deltaSeconds gigante
   if (deltaSeconds > 0.25f)
     deltaSeconds = 0.25f;
+
+  // ---- NOVO: checagem de captura (entra aqui) ----
+  float pdx = px - ex, pdz = pz - ez;
+  float playerDist = sqrt(pdx * pdx + pdz * pdz);
+  if (playerDist < 0.6f)
+    state = LOST;
+  // -------------------------------------------------
 
   if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
     recalcPath();
@@ -127,8 +147,6 @@ void enemyUpdate() {
     ex += (dx / dist) * step;
     ez += (dz / dist) * step;
   } else if (dist > 0.0001f) {
-    // já está mais perto do alvo do que o passo deste frame: encosta nele
-    // em vez de ultrapassar, evita oscilação de ida-e-volta no centro da célula
     ex = targetX;
     ez = targetZ;
   }

@@ -1,4 +1,5 @@
 #include "camera.h"
+#include "gamestate.h"
 #include "maze.h"
 #include <GL/glut.h>
 #include <cmath>
@@ -6,7 +7,7 @@
 // spawn = centro da célula (1,1), recalculado a partir de CELL_SIZE
 // (assim continua certo se você mudar a escala do labirinto de novo)
 float px = 1.5f * CELL_SIZE, py = 1.0f, pz = 1.5f * CELL_SIZE;
-float yaw = -M_PI / 2;
+float yaw = -PI / 2;
 float pitch = 0.0f;
 
 static const float PLAYER_RADIUS = 0.2f;
@@ -72,6 +73,19 @@ static bool checkCollision(float x, float z) {
          mazeIsWall(x + PLAYER_RADIUS, z + PLAYER_RADIUS);
 }
 
+// rede de segurança: nunca deixa px/pz saírem do grid do labirinto,
+// mesmo que a colisão por parede falhe (ex: passo grande, canto raspando)
+static void clampToMaze(float &x, float &z) {
+  float minCoord = PLAYER_RADIUS;
+  float maxX = LAB_W * CELL_SIZE - PLAYER_RADIUS;
+  float maxZ = LAB_H * CELL_SIZE - PLAYER_RADIUS;
+
+  if (x < minCoord) x = minCoord;
+  if (x > maxX) x = maxX;
+  if (z < minCoord) z = minCoord;
+  if (z > maxZ) z = maxZ;
+}
+
 void cameraMove(unsigned char key) {
   float speed = 0.1f;
   float dx = cos(yaw), dz = sin(yaw);
@@ -103,4 +117,7 @@ void cameraMove(unsigned char key) {
     px = newPx;
   if (!checkCollision(px, newPz))
     pz = newPz;
+
+  // garante que px/pz nunca saiam do grid, mesmo que a colisão por parede falhe
+  clampToMaze(px, pz);
 }
