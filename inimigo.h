@@ -1,11 +1,12 @@
-#ifndef INIMIGO_H
-#define INIMIGO_H
+#ifndef ENEMY_H
+#define ENEMY_H
 
-extern float ex, ez; // posição do inimigo em coordenadas de mundo
+#include <GL/glew.h>
 
-void enemyInit();
-void enemyUpdate(); // chamar todo frame; decide internamente quando recalcular
-                    // a rota
-void enemyDraw();
+extern float ex, ez;
+
+void enemyInit(GLuint shaderProg);
+void enemyUpdate();
+void enemyDraw(GLuint shaderProg);
 
 #endif

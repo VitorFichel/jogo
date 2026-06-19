@@ -1,15 +1,17 @@
 #ifndef CAMERA_H
 #define CAMERA_H
 
+#include <GL/glew.h>
+#include <glm/glm.hpp>
+
 extern float px, py, pz;
 extern float yaw, pitch;
 
-void cameraApply();
-void cameraApplyLight();
-void cameraMouseMotion(int x, int y);
+void cameraInit();
+glm::mat4 cameraGetView();
+glm::vec3 cameraGetDir(); // direção que a câmera aponta (pra lanterna)
 
-// novo padrão: estado de teclas + update por frame, em vez de mover só em
-// eventos de keypress (que repetem devagar e davam a sensação de travado)
+void cameraMouseMotion(int x, int y);
 void cameraKeyDown(unsigned char key);
 void cameraKeyUp(unsigned char key);
 void cameraUpdate();
