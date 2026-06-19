@@ -1,23 +1,20 @@
-#version 330 core
+#version 130
 
-layout(location = 0) in vec3 aPos;
-layout(location = 1) in vec3 aNormal;
+in vec3 aPos;
+in vec3 aNormal;
 
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
+uniform mat4 uModel;
+uniform mat3 uNormalMatrix;
 
-// matriz normal separada: evita distorção de iluminação quando o model
-// tem escala não-uniforme (ex: glScalef nas paredes do labirinto original)
-uniform mat3 normalMatrix;
-
-out vec3 fragPosWorld;
-out vec3 fragNormalWorld;
+out vec3 FragPos;
+out vec3 Normal;
 
 void main() {
-    vec4 worldPos = model * vec4(aPos, 1.0);
-    fragPosWorld = worldPos.xyz;
-    fragNormalWorld = normalize(normalMatrix * aNormal);
-
-    gl_Position = projection * view * worldPos;
+    // Calcula posição no mundo aplicando apenas a matriz do Modelo
+    vec4 worldPos = uModel * vec4(aPos, 1.0);
+    FragPos = vec3(worldPos);
+    Normal = normalize(uNormalMatrix * aNormal);
+    
+    // Multiplica pelas matrizes de Projeção e Visualização Legadas (herdadas da Camera)
+    gl_Position = gl_ProjectionMatrix * gl_ModelViewMatrix * worldPos; 
 }

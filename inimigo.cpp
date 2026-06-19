@@ -1,5 +1,5 @@
 #include "camera.h"
-#include "enemy.h"
+#include "inimigo.h"
 #include "maze.h"
 #include "shader.h"
 #include <GL/glut.h>

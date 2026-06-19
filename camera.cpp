@@ -33,6 +33,28 @@ glm::mat4 cameraGetView() {
   return glm::lookAt(pos, pos + dir, glm::vec3(0.0f, 1.0f, 0.0f));
 }
 
+// ==== FUNÇÕES ADICIONADAS ====
+void cameraApply() {
+  glm::vec3 dir = cameraGetDir();
+  gluLookAt(px, py, pz,
+            px + dir.x, py + dir.y, pz + dir.z,
+            0.0f, 1.0f, 0.0f);
+}
+
+void cameraApplyLight() {
+  // Posiciona a luz onde a câmera está
+  GLfloat lightPos[] = {px, py, pz, 1.0f};
+  glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+
+  // Direciona a luz (Lanterna)
+  glm::vec3 dir = cameraGetDir();
+  GLfloat spotDir[] = {dir.x, dir.y, dir.z};
+  glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, spotDir);
+  glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 15.0f); // Abertura da lanterna
+  glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 5.0f); // Concentração no centro
+}
+// =============================
+
 void cameraMouseMotion(int x, int y) {
   int cx = glutGet(GLUT_WINDOW_WIDTH) / 2;
   int cy = glutGet(GLUT_WINDOW_HEIGHT) / 2;

@@ -1,8 +1,15 @@
+#include <GL/glew.h> // DEVE VIR ANTES DO GLUT
+#include <GL/freeglut_std.h>
+#include <GL/glut.h>
 #include "camera.h"
 #include "inimigo.h"
 #include "maze.h"
-#include <GL/freeglut_std.h>
-#include <GL/glut.h>
+#include "shader.h"
+#include <iostream>
+
+// Variável global para armazenar o ID do Shader gerado
+GLuint globalShaderProgram = 0;
+Shader* myShader = nullptr;
 
 void display() {
   cameraUpdate();
@@ -12,11 +19,18 @@ void display() {
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
-  cameraApply();
   cameraApplyLight();
+  cameraApply();
 
-  mazeDraw();
-  enemyDraw();
+
+  // Ativa o shader antes de desenhar
+  if(myShader) myShader->use();
+
+  mazeDraw(globalShaderProgram);
+  enemyDraw(globalShaderProgram);
+
+  // Desativa o shader
+  glUseProgram(0);
 
   glutSwapBuffers();
 }
@@ -45,25 +59,35 @@ int main(int argc, char **argv) {
   glutInitWindowSize(800, 600);
   glutCreateWindow("Labirinto Horror");
 
+  // INICIALIZA O GLEW (Vital para Shaders Modernos)
+  glewExperimental = GL_TRUE;
+  if (glewInit() != GLEW_OK) {
+      std::cerr << "Falha ao inicializar o GLEW" << std::endl;
+      return -1;
+  }
+
   glEnable(GL_DEPTH_TEST);
   glEnable(GL_LIGHTING);
   glEnable(GL_LIGHT0);
   glEnable(GL_COLOR_MATERIAL);
-  glEnable(
-      GL_NORMALIZE); // corrige iluminação distorcida pelo glScalef nas paredes
+  glEnable(GL_NORMALIZE); 
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-  // ambiente 100% preto: a única luz que existe é a lanterna (GL_LIGHT0).
   GLfloat globalAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
   glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
 
   GLfloat lightAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
-  GLfloat lightDiffuse[] = {0.7f, 0.65f, 0.55f,
-                            1.0f}; // levemente amarelada, tipo lanterna
+  GLfloat lightDiffuse[] = {0.7f, 0.65f, 0.55f, 1.0f}; 
   glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
   glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
 
-  enemyInit();
+  // Carrega e Compila Shaders
+  myShader = new Shader("shader.vert", "shader.frag");
+  globalShaderProgram = myShader->programID;
+
+  // Inicializa Entidades passando o Shader e gera os VBOs do Labirinto
+  mazeInit(globalShaderProgram);
+  enemyInit(globalShaderProgram);
 
   glutDisplayFunc(display);
   glutReshapeFunc(reshape);
@@ -74,5 +98,7 @@ int main(int argc, char **argv) {
 
   glutSetCursor(GLUT_CURSOR_NONE);
   glutMainLoop();
+  
+  delete myShader;
   return 0;
 }

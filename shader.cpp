@@ -44,9 +44,6 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath) {
   std::string vertexSrc = readFile(vertexPath);
   std::string fragmentSrc = readFile(fragmentPath);
 
-  // ATENCAO: se readFile falhou (arquivo nao encontrado), a string fica
-  // vazia e o erro vai aparecer como "erro de compilacao" abaixo, sem
-  // mensagem clara de "arquivo nao existe" -- o aviso acima ja cobre isso.
   const char *vSrc = vertexSrc.c_str();
   const char *fSrc = fragmentSrc.c_str();
 
@@ -59,7 +56,6 @@ Shader::Shader(const char *vertexPath, const char *fragmentPath) {
   glLinkProgram(programID);
   checkLinkErrors();
 
-  // depois de linkado, os shaders individuais nao sao mais necessarios
   glDeleteShader(vertexShader);
   glDeleteShader(fragmentShader);
 }
@@ -95,4 +91,18 @@ void Shader::setFloat(const std::string &name, float value) const {
 void Shader::setInt(const std::string &name, int value) const {
   GLint loc = glGetUniformLocation(programID, name.c_str());
   glUniform1i(loc, value);
+}
+
+// === FUNÇÕES GLOBAIS ===
+void shaderSetMat4(GLuint prog, const char* name, const glm::mat4& mat) {
+  GLint loc = glGetUniformLocation(prog, name);
+  glUniformMatrix4fv(loc, 1, GL_FALSE, &mat[0][0]);
+}
+void shaderSetMat3(GLuint prog, const char* name, const glm::mat3& mat) {
+  GLint loc = glGetUniformLocation(prog, name);
+  glUniformMatrix3fv(loc, 1, GL_FALSE, &mat[0][0]);
+}
+void shaderSetVec3(GLuint prog, const char* name, const glm::vec3& vec) {
+  GLint loc = glGetUniformLocation(prog, name);
+  glUniform3f(loc, vec.x, vec.y, vec.z);
 }

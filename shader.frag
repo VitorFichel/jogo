@@ -1,39 +1,34 @@
-#version 330 core
+#version 130
 
-in vec3 fragPosWorld;
-in vec3 fragNormalWorld;
+in vec3 FragPos;
+in vec3 Normal;
 
-out vec4 fragColor;
-
-uniform vec3 objectColor;
-
-// luz tipo spotlight, equivalente ao GL_LIGHT0 que você tinha em main.cpp
-uniform vec3 lightPos;
-uniform vec3 lightColor;
-
-uniform vec3 viewPos; // posição da câmera, pra specular (se quiser usar depois)
-
-// atenuação (mesmo modelo clássico do fixed-function: constante/linear/quadrática)
-uniform float attConstant;
-uniform float attLinear;
-uniform float attQuadratic;
-
-uniform float ambientStrength;
+uniform vec3 uObjectColor;
+out vec4 FragColor;
 
 void main() {
-    vec3 norm = normalize(fragNormalWorld);
-    vec3 lightDir = normalize(lightPos - fragPosWorld);
-
-    // difusa (Lambert) — o equivalente direto do que o fixed-function calculava
-    float diff = max(dot(norm, lightDir), 0.0);
-
-    // atenuação por distância
-    float dist = length(lightPos - fragPosWorld);
-    float attenuation = 1.0 / (attConstant + attLinear * dist + attQuadratic * dist * dist);
-
-    vec3 ambient = ambientStrength * lightColor;
-    vec3 diffuse = diff * lightColor * attenuation;
-
-    vec3 result = (ambient + diffuse) * objectColor;
-    fragColor = vec4(result, 1.0);
+    // Pega a posição e direção da Lanterna (Legacy)
+    vec3 lightPos = vec3(gl_LightSource[0].position);
+    vec3 lightDir = normalize(lightPos - FragPos);
+    vec3 spotDir  = normalize(gl_LightSource[0].spotDirection);
+    
+    // Cálculo do Cone da Lanterna
+    float theta = dot(lightDir, -spotDir); 
+    float cutOff = gl_LightSource[0].spotCosCutoff;
+    
+    vec3 result = vec3(0.0); // Se estiver fora do cone, fica 100% escuro
+    
+    if(theta > cutOff) {       
+        // Difusa (Luz baseada na angulação da parede)
+        float diff = max(dot(Normal, lightDir), 0.0);
+        vec3 diffuse = gl_LightSource[0].diffuse.rgb * diff * uObjectColor;
+        
+        // Bordas suaves na lanterna
+        float epsilon = cutOff - 0.05;
+        float intensity = clamp((theta - cutOff) / epsilon, 0.0, 1.0);
+        
+        result = diffuse * intensity;
+    }
+    
+    FragColor = vec4(result, 1.0);
 }

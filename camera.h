@@ -9,7 +9,10 @@ extern float yaw, pitch;
 
 void cameraInit();
 glm::mat4 cameraGetView();
-glm::vec3 cameraGetDir(); // direção que a câmera aponta (pra lanterna)
+glm::vec3 cameraGetDir();
+
+void cameraApply();      // Faltava
+void cameraApplyLight(); // Faltava
 
 void cameraMouseMotion(int x, int y);
 void cameraKeyDown(unsigned char key);
