@@ -106,7 +106,7 @@ static void clampToMaze(float &x, float &z) {
 }
 
 void cameraMove(unsigned char key) {
-  float speed = 0.1f;
+  float speed = 0.15f; // Aumentei sutilmente a velocidade já que os corredores são maiores
   float dx = cos(yaw), dz = sin(yaw);
   float newPx = px, newPz = pz;
 
@@ -137,4 +137,10 @@ void cameraMove(unsigned char key) {
     pz = newPz;
 
   clampToMaze(px, pz);
+
+  // ---- NOVA CHECAGEM: CONDIÇÃO DE VITÓRIA ----
+  if (mazeIsExit(px, pz)) {
+    state = WON;
+  }
+  // -------------------------------------------
 }

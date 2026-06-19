@@ -1,23 +1,29 @@
 #include "maze.h"
 #include <GL/glut.h>
 
-// 1 = parede, 0 = corredor
+// 1 = parede, 0 = corredor, 2 = saída
 int maze[LAB_H][LAB_W] = {
-    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
-    {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-    {1, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1},
-    {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1},
-    {1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1},
-    {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1},
-    {1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1},
-    {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1},
-    {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1},
-    {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1},
-    {1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1},
-    {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1},
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
-    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+    {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 2, 1}, // Saída no (1, 19)
+    {1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1},
+    {1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1},
+    {1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1},
+    {1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1},
+    {1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1},
+    {1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1},
+    {1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1},
+    {1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1},
+    {1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1},
+    {1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1},
+    {1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1},
+    {1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1},
+    {1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1},
+    {1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1},
+    {1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 1},
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // Inimigo nasce aqui (19, 19)
+    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
 };
 
 static void drawWall(int col, int row) {
@@ -26,8 +32,7 @@ static void drawWall(int col, int row) {
 
   glPushMatrix();
   glTranslatef(x, WALL_HEIGHT / 2.0f, z);
-  glScalef(CELL_SIZE, WALL_HEIGHT,
-           CELL_SIZE); // cubo unitário escalado pro tamanho da célula
+  glScalef(CELL_SIZE, WALL_HEIGHT, CELL_SIZE); 
   glutSolidCube(1.0f);
   glPopMatrix();
 }
@@ -45,7 +50,7 @@ void mazeDraw() {
   glVertex3f(0, 0, depth);
   glEnd();
 
-  // Teto (mesma altura das paredes, sem vão)
+  // Teto
   glColor3f(0.1f, 0.1f, 0.1f);
   glBegin(GL_QUADS);
   glVertex3f(0, WALL_HEIGHT, 0);
@@ -54,11 +59,14 @@ void mazeDraw() {
   glVertex3f(0, WALL_HEIGHT, depth);
   glEnd();
 
-  // Paredes
-  glColor3f(0.4f, 0.4f, 0.4f);
+  // Paredes e Saída
   for (int row = 0; row < LAB_H; row++) {
     for (int col = 0; col < LAB_W; col++) {
       if (maze[row][col] == 1) {
+        glColor3f(0.4f, 0.4f, 0.4f); // Cor cinza padrão
+        drawWall(col, row);
+      } else if (maze[row][col] == 2) {
+        glColor3f(0.0f, 0.8f, 0.2f); // Verde neon para identificar a saída
         drawWall(col, row);
       }
     }
@@ -69,6 +77,14 @@ bool mazeIsWall(float x, float z) {
   int col = (int)(x / CELL_SIZE);
   int row = (int)(z / CELL_SIZE);
   if (col < 0 || col >= LAB_W || row < 0 || row >= LAB_H)
-    return true; // fora do mapa = parede
+    return true; 
   return maze[row][col] == 1;
+}
+
+bool mazeIsExit(float x, float z) {
+  int col = (int)(x / CELL_SIZE);
+  int row = (int)(z / CELL_SIZE);
+  if (col < 0 || col >= LAB_W || row < 0 || row >= LAB_H)
+    return false;
+  return maze[row][col] == 2;
 }

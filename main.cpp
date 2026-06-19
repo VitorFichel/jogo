@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
       GL_NORMALIZE); // corrige iluminação distorcida pelo glScalef nas paredes
 
   // ---- Lanterna (GL_LIGHT0 como spotlight) ----
-  glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 25.0f);
+  glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 50.0f);
   glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 15.0f);
   glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
   glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.05f);
