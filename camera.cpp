@@ -4,8 +4,6 @@
 #include <GL/glut.h>
 #include <cmath>
 
-// spawn = centro da célula (1,1), recalculado a partir de CELL_SIZE
-// (assim continua certo se você mudar a escala do labirinto de novo)
 float px = 1.5f * CELL_SIZE, py = 1.0f, pz = 1.5f * CELL_SIZE;
 float yaw = -PI / 2;
 float pitch = 0.0f;
@@ -16,7 +14,6 @@ static int lastMouseX, lastMouseY;
 static bool firstMouse = true;
 static bool warping = false;
 
-// direção pra onde a câmera está olhando, em vetor unitário (x,y,z)
 static void getViewDir(float &dx, float &dy, float &dz) {
   dx = cos(pitch) * cos(yaw);
   dy = sin(pitch);
@@ -26,20 +23,14 @@ static void getViewDir(float &dx, float &dy, float &dz) {
 void cameraApply() {
   float dx, dy, dz;
   getViewDir(dx, dy, dz);
-
   gluLookAt(px, py, pz, px + dx, py + dy, pz + dz, 0.0f, 1.0f, 0.0f);
 }
 
-// lanterna presa à câmera: posição = olho do jogador, direção = pra onde ele olha.
-// chamar todo frame em display(), depois de cameraApply() (precisa do GL_LIGHT0
-// já habilitado e configurado como spot em main(), ver comentário no main.cpp)
 void cameraApplyLight() {
   float dx, dy, dz;
   getViewDir(dx, dy, dz);
-
   GLfloat lightPos[] = {px, py, pz, 1.0f};
   GLfloat lightDir[] = {dx, dy, dz};
-
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
   glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, lightDir);
 }
@@ -71,10 +62,8 @@ void cameraMouseMotion(int x, int y) {
   yaw += dx;
   pitch += dy;
 
-  if (pitch > 1.5f)
-    pitch = 1.5f;
-  if (pitch < -1.5f)
-    pitch = -1.5f;
+  if (pitch > 1.5f) pitch = 1.5f;
+  if (pitch < -1.5f) pitch = -1.5f;
 
   warping = true;
   glutWarpPointer(cx, cy);
@@ -84,7 +73,6 @@ void cameraMouseMotion(int x, int y) {
   glutPostRedisplay();
 }
 
-// testa os 4 cantos do AABB do player contra as paredes do labirinto
 static bool checkCollision(float x, float z) {
   return mazeIsWall(x - PLAYER_RADIUS, z - PLAYER_RADIUS) ||
          mazeIsWall(x + PLAYER_RADIUS, z - PLAYER_RADIUS) ||
@@ -92,8 +80,6 @@ static bool checkCollision(float x, float z) {
          mazeIsWall(x + PLAYER_RADIUS, z + PLAYER_RADIUS);
 }
 
-// rede de segurança: nunca deixa px/pz saírem do grid do labirinto,
-// mesmo que a colisão por parede falhe (ex: passo grande, canto raspando)
 static void clampToMaze(float &x, float &z) {
   float minCoord = PLAYER_RADIUS;
   float maxX = LAB_W * CELL_SIZE - PLAYER_RADIUS;
@@ -105,42 +91,53 @@ static void clampToMaze(float &x, float &z) {
   if (z > maxZ) z = maxZ;
 }
 
-void cameraMove(unsigned char key) {
-  float speed = 0.15f; // Aumentei sutilmente a velocidade já que os corredores são maiores
+// ---- LÓGICA DE MOVIMENTO CONTÍNUO CORRIGIDA ----
+bool keys[256] = {false};
+bool isSprinting = false;
+static int lastCameraTime = 0;
+
+void cameraKeyDown(unsigned char key) {
+  if (key >= 'A' && key <= 'Z') key += 32; // Converte maiúscula para minúscula
+  keys[key] = true;
+}
+
+void cameraKeyUp(unsigned char key) {
+  if (key >= 'A' && key <= 'Z') key += 32;
+  keys[key] = false;
+}
+
+void cameraUpdate() {
+  int now = glutGet(GLUT_ELAPSED_TIME);
+  if (lastCameraTime == 0) lastCameraTime = now;
+
+  float dt = (now - lastCameraTime) / 1000.0f;
+  lastCameraTime = now;
+
+  if (dt <= 0.001f) return; 
+  if (dt > 0.1f) dt = 0.1f;
+
+  // ---- NOVA LÓGICA DE CORRIDA (Usando a Barra de Espaço) ----
+  float baseSpeed = 4.5f;
+  float sprintSpeed = 12.0f; // Valor bem alto para testar o "modo Usain Bolt"
+  
+  // Lê diretamente do nosso array de teclas. O espaço é ' '
+  float speed = keys[' '] ? sprintSpeed : baseSpeed; 
+  // -----------------------------------------------------------
+
   float dx = cos(yaw), dz = sin(yaw);
   float newPx = px, newPz = pz;
 
-  switch (key) {
-  case 'w':
-    newPx += dx * speed;
-    newPz += dz * speed;
-    break;
-  case 's':
-    newPx -= dx * speed;
-    newPz -= dz * speed;
-    break;
-  case 'a':
-    newPx += dz * speed;
-    newPz -= dx * speed;
-    break;
-  case 'd':
-    newPx -= dz * speed;
-    newPz += dx * speed;
-    break;
-  default:
-    return;
-  }
+  if (keys['w']) { newPx += dx * speed * dt; newPz += dz * speed * dt; }
+  if (keys['s']) { newPx -= dx * speed * dt; newPz -= dz * speed * dt; }
+  if (keys['a']) { newPx += dz * speed * dt; newPz -= dx * speed * dt; }
+  if (keys['d']) { newPx -= dz * speed * dt; newPz += dx * speed * dt; }
 
-  if (!checkCollision(newPx, pz))
-    px = newPx;
-  if (!checkCollision(px, newPz))
-    pz = newPz;
+  if (!checkCollision(newPx, pz)) px = newPx;
+  if (!checkCollision(px, newPz)) pz = newPz;
 
   clampToMaze(px, pz);
 
-  // ---- NOVA CHECAGEM: CONDIÇÃO DE VITÓRIA ----
   if (mazeIsExit(px, pz)) {
     state = WON;
   }
-  // -------------------------------------------
 }
