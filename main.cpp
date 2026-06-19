@@ -1,59 +1,24 @@
 #include "camera.h"
-#include "gamestate.h"
 #include "inimigo.h"
 #include "maze.h"
 #include <GL/freeglut_std.h>
 #include <GL/glut.h>
 
 void display() {
-  if (state == PLAYING)
-    enemyUpdate();
+  cameraUpdate();
+  enemyUpdate();
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   cameraApply();
-
-  GLfloat lpos[] = {7.0f, 5.0f, 7.0f, 1.0f};
-  glLightfv(GL_LIGHT0, GL_POSITION, lpos);
+  cameraApplyLight();
 
   mazeDraw();
   enemyDraw();
 
-  if (state != PLAYING) {
-    // overlay 2D: troca pra projeção ortográfica
-    glMatrixMode(GL_PROJECTION);
-    glPushMatrix();
-    glLoadIdentity();
-    glOrtho(0, 800, 0, 600, -1, 1);
-    glMatrixMode(GL_MODELVIEW);
-    glPushMatrix();
-    glLoadIdentity();
-    glDisable(GL_LIGHTING);
-    glDisable(GL_DEPTH_TEST);
-
-    glColor3f(1, 0, 0);
-    glRasterPos2i(330, 300);
-    const char *msg = (state == LOST) ? "GAME OVER - aperte R" : "VOCE VENCEU - aperte R";
-    for (const char *c = msg; *c; c++)
-      glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
-
-    glEnable(GL_LIGHTING);
-    glEnable(GL_DEPTH_TEST);
-    glPopMatrix();
-    glMatrixMode(GL_PROJECTION);
-    glPopMatrix();
-    glMatrixMode(GL_MODELVIEW);
-  }
-
   glutSwapBuffers();
-}
-
-void keyboard(unsigned char key, int x, int y) {
-  if (key == 27) exit(0);
-  if (key == 'r' || key == 'R') { gameReset(); return; }
-  if (state == PLAYING) cameraMove(key);
-  glutPostRedisplay();
 }
 
 void reshape(int w, int h) {
@@ -63,6 +28,14 @@ void reshape(int w, int h) {
   gluPerspective(60.0f, (float)w / h, 0.1f, 100.0f);
   glMatrixMode(GL_MODELVIEW);
 }
+
+void keyboard(unsigned char key, int x, int y) {
+  if (key == 27)
+    exit(0);
+  cameraKeyDown(key);
+}
+
+void keyboardUp(unsigned char key, int x, int y) { cameraKeyUp(key); }
 
 void idle() { glutPostRedisplay(); }
 
@@ -80,13 +53,22 @@ int main(int argc, char **argv) {
       GL_NORMALIZE); // corrige iluminação distorcida pelo glScalef nas paredes
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  // ambiente 100% preto: a única luz que existe é a lanterna (GL_LIGHT0).
+  GLfloat globalAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
+  glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
+
+  GLfloat lightAmbient[] = {0.0f, 0.0f, 0.0f, 1.0f};
+  GLfloat lightDiffuse[] = {0.7f, 0.65f, 0.55f,
+                            1.0f}; // levemente amarelada, tipo lanterna
+  glLightfv(GL_LIGHT0, GL_AMBIENT, lightAmbient);
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
 
   enemyInit();
 
   glutDisplayFunc(display);
   glutReshapeFunc(reshape);
   glutKeyboardFunc(keyboard);
+  glutKeyboardUpFunc(keyboardUp);
   glutPassiveMotionFunc(cameraMouseMotion);
   glutIdleFunc(idle);
 
