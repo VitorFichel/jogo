@@ -90,6 +90,20 @@ int main(int argc, char **argv) {
   glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lowAmbient);
   // -----------------------------------------------
 
+  // ---- NOVA IMPLEMENTAÇÃO: Atmosfera de Terror (Fog) ----
+  glEnable(GL_FOG);
+  GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f}; // Névoa preta (escuridão total)
+  glFogfv(GL_FOG_COLOR, fogColor);
+  
+  // Usamos GL_LINEAR para ter controle exato de onde a escuridão começa e termina
+  glFogi(GL_FOG_MODE, GL_LINEAR); 
+  
+  // Como o CELL_SIZE agora é 4.5f, 18.0f significa que a visão do jogador 
+  // some completamente após cerca de 4 corredores de distância.
+  glFogf(GL_FOG_START, 2.0f);   // Começa a escurecer logo na frente da câmera
+  glFogf(GL_FOG_END, 18.0f);    // Fica 100% preto a 18 unidades de distância
+  // -------------------------------------------------------
+
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
   enemyInit();
