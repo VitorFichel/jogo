@@ -1,5 +1,5 @@
 CXX = g++
-LIBS = -lfreeglut -lopengl32 -lglu32 
+LIBS = -lfreeglut -lopengl32 -lglu32 -lpthread -lm
 SRCS = *.cpp 
 OUT = labirinto
 

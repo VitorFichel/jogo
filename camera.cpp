@@ -8,6 +8,9 @@ float px = 1.5f * CELL_SIZE, py = 1.0f, pz = 1.5f * CELL_SIZE;
 float yaw = -PI / 2;
 float pitch = 0.0f;
 
+float stamina = 100.0f;       // Inicia com fôlego total
+bool isExhausted = false;     // Inicia descansado
+
 static const float PLAYER_RADIUS = 0.2f;
 
 static int lastMouseX, lastMouseY;
@@ -116,13 +119,33 @@ void cameraUpdate() {
   if (dt <= 0.001f) return; 
   if (dt > 0.1f) dt = 0.1f;
 
-  // ---- NOVA LÓGICA DE CORRIDA (Usando a Barra de Espaço) ----
+  // ---- NOVA LÓGICA DE CORRIDA COM ESTAMINA ----
   float baseSpeed = 4.5f;
-  float sprintSpeed = 12.0f; // Valor bem alto para testar o "modo Usain Bolt"
+  float sprintSpeed = 12.0f; 
+  float exhaustedSpeed = 3.0f; 
+  float speed = baseSpeed;
   
-  // Lê diretamente do nosso array de teclas. O espaço é ' '
-  float speed = keys[' '] ? sprintSpeed : baseSpeed; 
-  // -----------------------------------------------------------
+  // Verifica se o jogador está tentando se mover
+  bool isMoving = (keys['w'] || keys['s'] || keys['a'] || keys['d']);
+
+  if (keys[' '] && !isExhausted && isMoving) {
+      speed = sprintSpeed;
+      stamina -= 25.0f * dt; // Drena tudo em 4 segundos de corrida
+      if (stamina <= 0.0f) {
+          stamina = 0.0f;
+          isExhausted = true; // Bateu o cansaço
+      }
+  } else {
+      if (isExhausted) speed = exhaustedSpeed; // Punição de velocidade
+      
+      stamina += 10.0f * dt; // Demora 10 segundos para recuperar o fôlego total
+      if (stamina >= 100.0f) {
+          stamina = 100.0f;
+          isExhausted = false; // Só volta a correr quando recuperar 100%
+      }
+  }
+
+  // (A linha problemática que redeclarava o speed foi removida daqui)
 
   float dx = cos(yaw), dz = sin(yaw);
   float newPx = px, newPz = pz;
