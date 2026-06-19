@@ -14,21 +14,40 @@ static const float PLAYER_RADIUS = 0.2f;
 
 static int lastMouseX, lastMouseY;
 static bool firstMouse = true;
-static bool warping = false; // <-- flag nova
+static bool warping = false;
+
+// direção pra onde a câmera está olhando, em vetor unitário (x,y,z)
+static void getViewDir(float &dx, float &dy, float &dz) {
+  dx = cos(pitch) * cos(yaw);
+  dy = sin(pitch);
+  dz = cos(pitch) * sin(yaw);
+}
 
 void cameraApply() {
-  float dx = cos(pitch) * cos(yaw);
-  float dy = sin(pitch);
-  float dz = cos(pitch) * sin(yaw);
+  float dx, dy, dz;
+  getViewDir(dx, dy, dz);
 
   gluLookAt(px, py, pz, px + dx, py + dy, pz + dz, 0.0f, 1.0f, 0.0f);
+}
+
+// lanterna presa à câmera: posição = olho do jogador, direção = pra onde ele olha.
+// chamar todo frame em display(), depois de cameraApply() (precisa do GL_LIGHT0
+// já habilitado e configurado como spot em main(), ver comentário no main.cpp)
+void cameraApplyLight() {
+  float dx, dy, dz;
+  getViewDir(dx, dy, dz);
+
+  GLfloat lightPos[] = {px, py, pz, 1.0f};
+  GLfloat lightDir[] = {dx, dy, dz};
+
+  glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+  glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, lightDir);
 }
 
 void cameraMouseMotion(int x, int y) {
   int cx = glutGet(GLUT_WINDOW_WIDTH) / 2;
   int cy = glutGet(GLUT_WINDOW_HEIGHT) / 2;
 
-  // ignora o evento causado pelo próprio warp
   if (warping) {
     warping = false;
     lastMouseX = cx;
@@ -112,12 +131,10 @@ void cameraMove(unsigned char key) {
     return;
   }
 
-  // testa cada eixo separadamente pra permitir "deslizar" na parede
   if (!checkCollision(newPx, pz))
     px = newPx;
   if (!checkCollision(px, newPz))
     pz = newPz;
 
-  // garante que px/pz nunca saiam do grid, mesmo que a colisão por parede falhe
   clampToMaze(px, pz);
 }

@@ -13,15 +13,12 @@ void display() {
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   cameraApply();
-
-  GLfloat lpos[] = {7.0f, 5.0f, 7.0f, 1.0f};
-  glLightfv(GL_LIGHT0, GL_POSITION, lpos);
+  cameraApplyLight(); // lanterna: posição/direção seguem a câmera todo frame
 
   mazeDraw();
   enemyDraw();
 
   if (state != PLAYING) {
-    // overlay 2D: troca pra projeção ortográfica
     glMatrixMode(GL_PROJECTION);
     glPushMatrix();
     glLoadIdentity();
@@ -78,7 +75,20 @@ int main(int argc, char **argv) {
   glEnable(GL_COLOR_MATERIAL);
   glEnable(
       GL_NORMALIZE); // corrige iluminação distorcida pelo glScalef nas paredes
-  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+  // ---- Lanterna (GL_LIGHT0 como spotlight) ----
+  glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 25.0f);
+  glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 15.0f);
+  glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
+  glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.05f);
+  glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.02f);
+
+  GLfloat lightDiffuse[] = {1.0f, 0.95f, 0.8f, 1.0f}; // tom quente, tipo lanterna real
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+
+  GLfloat lowAmbient[] = {0.04f, 0.04f, 0.05f, 1.0f};
+  glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lowAmbient);
+  // -----------------------------------------------
 
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 

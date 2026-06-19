@@ -14,12 +14,69 @@ static const int RECALC_INTERVAL_MS = 500;      // recalcula rota a cada 0.5s
 static int lastRecalcTime = 0;
 static int lastUpdateTime = 0;
 
-// próxima célula do caminho (em coordenadas de mundo, centro da célula)
 static float targetX, targetZ;
 static bool hasTarget = false;
 
+// ---- billboard do inimigo ----
+// textura gerada por código (silhueta encapuzada + olhos vermelhos), sem
+// depender de nenhum arquivo .png nem biblioteca de imagem
+static const int ENEMY_TEX_SIZE = 64;
+static GLuint enemyTexture = 0;
+static bool enemyTextureReady = false;
+
+static void buildEnemyTexture() {
+  if (enemyTextureReady)
+    return;
+
+  std::vector<unsigned char> pixels(ENEMY_TEX_SIZE * ENEMY_TEX_SIZE * 4, 0);
+
+  for (int y = 0; y < ENEMY_TEX_SIZE; y++) {
+    for (int x = 0; x < ENEMY_TEX_SIZE; x++) {
+      float u = (x + 0.5f) / ENEMY_TEX_SIZE - 0.5f;
+      float v = (y + 0.5f) / ENEMY_TEX_SIZE;
+
+      float bodyHalfWidth = 0.10f + 0.32f * (1.0f - v);
+      bool insideBody = fabs(u) < bodyHalfWidth && v > 0.04f && v < 0.96f;
+
+      unsigned char r = 0, g = 0, b = 0, a = 0;
+      if (insideBody) {
+        float edgeDist = bodyHalfWidth - fabs(u);
+        a = (unsigned char)(edgeDist * 900.0f > 255.0f ? 255 : edgeDist * 900.0f);
+        r = 12; g = 10; b = 15;
+      }
+
+      float eyeY = 0.78f, eyeDX = 0.05f, eyeR = 0.035f;
+      float d1 = sqrt((u + eyeDX) * (u + eyeDX) + (v - eyeY) * (v - eyeY));
+      float d2 = sqrt((u - eyeDX) * (u - eyeDX) + (v - eyeY) * (v - eyeY));
+      if (d1 < eyeR || d2 < eyeR) {
+        r = 220; g = 25; b = 15;
+        a = 255;
+      }
+
+      int idx = (y * ENEMY_TEX_SIZE + x) * 4;
+      pixels[idx + 0] = r;
+      pixels[idx + 1] = g;
+      pixels[idx + 2] = b;
+      pixels[idx + 3] = a;
+    }
+  }
+
+  glGenTextures(1, &enemyTexture);
+  glBindTexture(GL_TEXTURE_2D, enemyTexture);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ENEMY_TEX_SIZE, ENEMY_TEX_SIZE, 0,
+               GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+  enemyTextureReady = true;
+}
+// -------------------------------
+
 void enemyInit() {
-  // spawn do inimigo num canto oposto ao do player, ajuste conforme seu mapa
+  buildEnemyTexture();
+
   ex = (LAB_W - 2 + 0.5f) * CELL_SIZE;
   ez = (LAB_H - 2 + 0.5f) * CELL_SIZE;
   hasTarget = false;
@@ -27,10 +84,8 @@ void enemyInit() {
   lastUpdateTime = glutGet(GLUT_ELAPSED_TIME);
 }
 
-// BFS em grid: acha o primeiro passo do caminho mais curto até a célula do player
 static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
                          int &outRow, int &outCol) {
-  // proteção: goal (ou start) fora do grid não pode ser indexado
   if (startRow < 0 || startRow >= LAB_H || startCol < 0 || startCol >= LAB_W ||
       goalRow < 0 || goalRow >= LAB_H || goalCol < 0 || goalCol >= LAB_W)
     return false;
@@ -73,9 +128,8 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
   }
 
   if (!visited[goalRow][goalCol])
-    return false; // sem caminho possível
+    return false;
 
-  // reconstrói o caminho de trás pra frente até achar o passo logo após o start
   int row = goalRow, col = goalCol;
   while (cameFrom[row][col] != std::make_pair(startRow, startCol)) {
     auto prev = cameFrom[row][col];
@@ -94,8 +148,6 @@ static void recalcPath() {
   int playerCol = (int)(px / CELL_SIZE);
   int playerRow = (int)(pz / CELL_SIZE);
 
-  // mesma célula do grid: BFS não dá próximo passo (já "chegou"),
-  // então persegue direto em linha reta até a posição exata do player
   if (enemyRow == playerRow && enemyCol == playerCol) {
     targetX = px;
     targetZ = pz;
@@ -109,7 +161,7 @@ static void recalcPath() {
     targetZ = (nextRow + 0.5f) * CELL_SIZE;
     hasTarget = true;
   } else {
-    hasTarget = false; // player inalcançável (não devia acontecer num labirinto conectado)
+    hasTarget = false;
   }
 }
 
@@ -122,12 +174,10 @@ void enemyUpdate() {
   if (deltaSeconds > 0.25f)
     deltaSeconds = 0.25f;
 
-  // ---- NOVO: checagem de captura (entra aqui) ----
   float pdx = px - ex, pdz = pz - ez;
   float playerDist = sqrt(pdx * pdx + pdz * pdz);
   if (playerDist < 0.6f)
     state = LOST;
-  // -------------------------------------------------
 
   if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
     recalcPath();
@@ -153,9 +203,44 @@ void enemyUpdate() {
 }
 
 void enemyDraw() {
-  glColor3f(0.8f, 0.1f, 0.1f); // vermelho, placeholder
+  float dx = px - ex;
+  float dz = pz - ez;
+  float angle = atan2(dx, dz) * 180.0f / PI;
+
   glPushMatrix();
-  glTranslatef(ex, 0.5f, ez);
-  glutSolidCube(0.8f); // um pouco menor que a parede pra distinguir visualmente
+  glTranslatef(ex, 0.0f, ez);
+  glRotatef(angle, 0.0f, 1.0f, 0.0f);
+
+  // sprite "auto-iluminado": desliga GL_LIGHTING pra textura aparecer com as
+  // cores cruas (é isso que faz os olhos vermelhos brilharem mesmo fora do
+  // cone da lanterna — efeito clássico de "algo te observando no escuro")
+  glDisable(GL_LIGHTING);
+  glEnable(GL_TEXTURE_2D);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glDepthMask(GL_FALSE);
+
+  glColor3f(1.0f, 1.0f, 1.0f);
+  glBindTexture(GL_TEXTURE_2D, enemyTexture);
+
+  float halfWidth = 0.5f;
+  float height = 1.7f;
+
+  glBegin(GL_QUADS);
+  glTexCoord2f(0.0f, 0.0f);
+  glVertex3f(-halfWidth, 0.0f, 0.0f);
+  glTexCoord2f(1.0f, 0.0f);
+  glVertex3f(halfWidth, 0.0f, 0.0f);
+  glTexCoord2f(1.0f, 1.0f);
+  glVertex3f(halfWidth, height, 0.0f);
+  glTexCoord2f(0.0f, 1.0f);
+  glVertex3f(-halfWidth, height, 0.0f);
+  glEnd();
+
+  glDepthMask(GL_TRUE);
+  glDisable(GL_BLEND);
+  glDisable(GL_TEXTURE_2D);
+  glEnable(GL_LIGHTING);
+
   glPopMatrix();
 }
