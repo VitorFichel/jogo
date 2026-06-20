@@ -3,7 +3,7 @@
 #include "maze.h"
 #include <GL/glut.h>
 #include <cmath>
-#include <cstdlib> // Adicionado para gerar os números aleatórios (rand)
+#include <cstdlib> 
 
 float px = 1.5f * CELL_SIZE, py = 1.0f, pz = 1.5f * CELL_SIZE;
 float yaw = -PI / 2;
@@ -12,11 +12,21 @@ float pitch = 0.0f;
 float stamina = 100.0f;
 bool isExhausted = false;
 
-// ---- VARIÁVEIS DA LANTERNA DEFEITUOSA ----
+// ---- VARIÁVEIS DA LANTERNA DEFEITUOSA (Nova Lógica de Padrão) ----
 float flashlightIntensity = 1.0f;
-static int nextFlickerTime = 0;
-static int flickerEndTime = 0;
-// ------------------------------------------
+static int nextSequenceCheckTime = 0; // Quando verificar se uma sequência começa
+static int currentStageEndTime = 0;    // Quando o estágio atual da piscada termina
+
+// Definição dos estágios da sequência de falha
+enum FlickerStage { 
+    NORMAL, 
+    PISCA_1_OFF, PISCA_1_ON, 
+    PISCA_2_OFF, PISCA_2_ON, 
+    PISCA_3_OFF, PISCA_3_ON, 
+    APAGAO_LONGO 
+};
+static FlickerStage currentStage = NORMAL;
+// ------------------------------------------------------------------
 
 static const float PLAYER_RADIUS = 0.2f;
 
@@ -44,7 +54,7 @@ void cameraApplyLight() {
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
   glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, lightDir);
 
-  // Aplica a falha elétrica na intensidade da luz dinamicamente
+  // Aplica a intensidade calculada na luz diffuse
   GLfloat lightDiffuse[] = {1.0f * flashlightIntensity, 0.95f * flashlightIntensity, 0.8f * flashlightIntensity, 1.0f};
   glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
 }
@@ -128,28 +138,64 @@ void cameraUpdate() {
   if (dt <= 0.001f) return; 
   if (dt > 0.1f) dt = 0.1f;
 
-  // ---- LÓGICA DA LANTERNA DEFEITUOSA ----
-  if (now > nextFlickerTime) {
-      int chance = rand() % 1000;
-      if (chance < 15) { 
-          // 1.5% de probabilidade de dar mau contacto rápido (flicker)
-          flashlightIntensity = (rand() % 50) / 100.0f; 
-          flickerEndTime = now + 50 + (rand() % 150);
-      } else if (chance < 18) { 
-          // 0.3% de probabilidade de apagar completamente!
-          flashlightIntensity = 0.0f;
-          flickerEndTime = now + 1000 + (rand() % 2500); // Fica no escuro de 1s a 3.5s
+  // ---- NOVA LÓGICA DE LANTERNA DEFEITUOSA (Máquina de Estados de Padrão) ----
+  
+  // 1. Se estivermos numa sequência, verifica se é hora de mudar de estágio
+  if (currentStage != NORMAL && now > currentStageEndTime) {
+      switch (currentStage) {
+          case PISCA_1_OFF:
+              currentStage = PISCA_1_ON;
+              flashlightIntensity = 1.0f; // Liga
+              currentStageEndTime = now + 40 + (rand() % 40); // Tempo ON curto
+              break;
+          case PISCA_1_ON:
+              currentStage = PISCA_2_OFF;
+              flashlightIntensity = 0.1f; // Quase desliga
+              currentStageEndTime = now + 30 + (rand() % 30); // Tempo OFF curto
+              break;
+          case PISCA_2_ON:
+              currentStage = PISCA_3_OFF;
+              flashlightIntensity = 0.0f; // Desliga total
+              currentStageEndTime = now + 30 + (rand() % 30); // Tempo OFF curto
+              break;
+          case PISCA_3_OFF:
+              currentStage = PISCA_3_ON;
+              flashlightIntensity = 0.8f; // Liga, mas fraca
+              currentStageEndTime = now + 60 + (rand() % 60); // Tempo ON médio
+              break;
+          case PISCA_3_ON:
+              currentStage = APAGAO_LONGO;
+              flashlightIntensity = 0.0f; // BREU TOTAL
+              // O apagão assustador: 1.5s a 4s de escuridão
+              currentStageEndTime = now + 1500 + (rand() % 2500); 
+              break;
+          case APAGAO_LONGO:
+              // Fim da sequência terrível, volta ao normal
+              currentStage = NORMAL;
+              flashlightIntensity = 1.0f;
+              // Cooldown longo antes de poder falhar de novo (15 a 30 segundos)
+              nextSequenceCheckTime = now + 15000 + (rand() % 15000); 
+              break;
+          // Casos ON intermediários que apenas pulam pro próximo OFF
+          case PISCA_2_OFF: currentStage = PISCA_2_ON; flashlightIntensity = 1.0f; currentStageEndTime = now + 40; break;
+          default: break;
       }
-      nextFlickerTime = now + 100; // Sorteia de novo a cada 100ms
   }
 
-  // Restaura a luz se o tempo da falha já tiver passado
-  if (now > flickerEndTime && flashlightIntensity != 1.0f) {
-      flashlightIntensity = 1.0f; 
+  // 2. Se estiver tudo normal, sorteia se uma sequência aterrorizante começa
+  if (currentStage == NORMAL && now > nextSequenceCheckTime) {
+      // Sorteia a cada 200ms para não pesar
+      if ((rand() % 1000) < 8) { // 0.8% de chance por verificação
+          currentStage = PISCA_1_OFF;
+          flashlightIntensity = 0.2f; // Começa falhando
+          // Duração da primeira piscada OFF
+          currentStageEndTime = now + 50 + (rand() % 50); 
+      }
+      nextSequenceCheckTime = now + 200; 
   }
-  // ---------------------------------------
+  // ---------------------------------------------------------------------------
 
-  // ---- LÓGICA DE CORRIDA COM ESTAMINA ----
+  // ---- LÓGICA DE CORRIDA COM ESTAMINA (Mantida) ----
   float baseSpeed = 4.5f;
   float sprintSpeed = 12.0f; 
   float exhaustedSpeed = 3.0f; 
