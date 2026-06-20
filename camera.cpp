@@ -12,12 +12,17 @@ float pitch = 0.0f;
 float stamina = 100.0f;
 bool isExhausted = false;
 
-// ---- VARIÁVEIS DA LANTERNA DEFEITUOSA (Nova Lógica de Padrão) ----
-float flashlightIntensity = 1.0f;
-static int nextSequenceCheckTime = 0; // Quando verificar se uma sequência começa
-static int currentStageEndTime = 0;    // Quando o estágio atual da piscada termina
+// ---- VARIÁVEIS DE HEAD BOBBING (Caminhada Realista) ----
+static float bobPhase = 0.0f;
+static float bobOffsetY = 0.0f; // Sobe e desce
+static float bobOffsetX = 0.0f; // Direita e esquerda
+// ---------------------------------------------------------
 
-// Definição dos estágios da sequência de falha
+// ---- VARIÁVEIS DA LANTERNA DEFEITUOSA ----
+float flashlightIntensity = 1.0f;
+static int nextSequenceCheckTime = 0; 
+static int currentStageEndTime = 0;    
+
 enum FlickerStage { 
     NORMAL, 
     PISCA_1_OFF, PISCA_1_ON, 
@@ -26,7 +31,7 @@ enum FlickerStage {
     APAGAO_LONGO 
 };
 static FlickerStage currentStage = NORMAL;
-// ------------------------------------------------------------------
+// ------------------------------------------
 
 static const float PLAYER_RADIUS = 0.2f;
 
@@ -43,18 +48,38 @@ static void getViewDir(float &dx, float &dy, float &dz) {
 void cameraApply() {
   float dx, dy, dz;
   getViewDir(dx, dy, dz);
-  gluLookAt(px, py, pz, px + dx, py + dy, pz + dz, 0.0f, 1.0f, 0.0f);
+  
+  // Calcula o Vetor Direita (Right Vector) a partir do Yaw para fazer o balanço lateral
+  float rx = -sin(yaw);
+  float rz = cos(yaw);
+
+  // Aplica os offsets verticais e horizontais na câmara
+  float finalPx = px + rx * bobOffsetX;
+  float finalPy = py + bobOffsetY;
+  float finalPz = pz + rz * bobOffsetX;
+
+  gluLookAt(finalPx, finalPy, finalPz, 
+            finalPx + dx, finalPy + dy, finalPz + dz, 
+            0.0f, 1.0f, 0.0f);
 }
 
 void cameraApplyLight() {
   float dx, dy, dz;
   getViewDir(dx, dy, dz);
-  GLfloat lightPos[] = {px, py, pz, 1.0f};
+  
+  float rx = -sin(yaw);
+  float rz = cos(yaw);
+
+  float finalPx = px + rx * bobOffsetX;
+  float finalPy = py + bobOffsetY;
+  float finalPz = pz + rz * bobOffsetX;
+
+  // A luz acompanha perfeitamente a mão com o balanço realista
+  GLfloat lightPos[] = {finalPx, finalPy, finalPz, 1.0f};
   GLfloat lightDir[] = {dx, dy, dz};
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
   glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, lightDir);
 
-  // Aplica a intensidade calculada na luz diffuse
   GLfloat lightDiffuse[] = {1.0f * flashlightIntensity, 0.95f * flashlightIntensity, 0.8f * flashlightIntensity, 1.0f};
   glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
 }
@@ -138,64 +163,30 @@ void cameraUpdate() {
   if (dt <= 0.001f) return; 
   if (dt > 0.1f) dt = 0.1f;
 
-  // ---- NOVA LÓGICA DE LANTERNA DEFEITUOSA (Máquina de Estados de Padrão) ----
-  
-  // 1. Se estivermos numa sequência, verifica se é hora de mudar de estágio
+  // ---- MÁQUINA DE ESTADOS DA LANTERNA ----
   if (currentStage != NORMAL && now > currentStageEndTime) {
       switch (currentStage) {
-          case PISCA_1_OFF:
-              currentStage = PISCA_1_ON;
-              flashlightIntensity = 1.0f; // Liga
-              currentStageEndTime = now + 40 + (rand() % 40); // Tempo ON curto
-              break;
-          case PISCA_1_ON:
-              currentStage = PISCA_2_OFF;
-              flashlightIntensity = 0.1f; // Quase desliga
-              currentStageEndTime = now + 30 + (rand() % 30); // Tempo OFF curto
-              break;
-          case PISCA_2_ON:
-              currentStage = PISCA_3_OFF;
-              flashlightIntensity = 0.0f; // Desliga total
-              currentStageEndTime = now + 30 + (rand() % 30); // Tempo OFF curto
-              break;
-          case PISCA_3_OFF:
-              currentStage = PISCA_3_ON;
-              flashlightIntensity = 0.8f; // Liga, mas fraca
-              currentStageEndTime = now + 60 + (rand() % 60); // Tempo ON médio
-              break;
-          case PISCA_3_ON:
-              currentStage = APAGAO_LONGO;
-              flashlightIntensity = 0.0f; // BREU TOTAL
-              // O apagão assustador: 1.5s a 4s de escuridão
-              currentStageEndTime = now + 1500 + (rand() % 2500); 
-              break;
-          case APAGAO_LONGO:
-              // Fim da sequência terrível, volta ao normal
-              currentStage = NORMAL;
-              flashlightIntensity = 1.0f;
-              // Cooldown longo antes de poder falhar de novo (15 a 30 segundos)
-              nextSequenceCheckTime = now + 15000 + (rand() % 15000); 
-              break;
-          // Casos ON intermediários que apenas pulam pro próximo OFF
+          case PISCA_1_OFF: currentStage = PISCA_1_ON; flashlightIntensity = 1.0f; currentStageEndTime = now + 40 + (rand() % 40); break;
+          case PISCA_1_ON: currentStage = PISCA_2_OFF; flashlightIntensity = 0.1f; currentStageEndTime = now + 30 + (rand() % 30); break;
+          case PISCA_2_ON: currentStage = PISCA_3_OFF; flashlightIntensity = 0.0f; currentStageEndTime = now + 30 + (rand() % 30); break;
+          case PISCA_3_OFF: currentStage = PISCA_3_ON; flashlightIntensity = 0.8f; currentStageEndTime = now + 60 + (rand() % 60); break;
+          case PISCA_3_ON: currentStage = APAGAO_LONGO; flashlightIntensity = 0.0f; currentStageEndTime = now + 1500 + (rand() % 2500); break;
+          case APAGAO_LONGO: currentStage = NORMAL; flashlightIntensity = 1.0f; nextSequenceCheckTime = now + 15000 + (rand() % 15000); break;
           case PISCA_2_OFF: currentStage = PISCA_2_ON; flashlightIntensity = 1.0f; currentStageEndTime = now + 40; break;
           default: break;
       }
   }
 
-  // 2. Se estiver tudo normal, sorteia se uma sequência aterrorizante começa
   if (currentStage == NORMAL && now > nextSequenceCheckTime) {
-      // Sorteia a cada 200ms para não pesar
-      if ((rand() % 1000) < 8) { // 0.8% de chance por verificação
+      if ((rand() % 1000) < 8) { 
           currentStage = PISCA_1_OFF;
-          flashlightIntensity = 0.2f; // Começa falhando
-          // Duração da primeira piscada OFF
+          flashlightIntensity = 0.2f; 
           currentStageEndTime = now + 50 + (rand() % 50); 
       }
       nextSequenceCheckTime = now + 200; 
   }
-  // ---------------------------------------------------------------------------
 
-  // ---- LÓGICA DE CORRIDA COM ESTAMINA (Mantida) ----
+  // ---- LÓGICA DE CORRIDA E ESTAMINA ----
   float baseSpeed = 4.5f;
   float sprintSpeed = 12.0f; 
   float exhaustedSpeed = 3.0f; 
@@ -217,6 +208,29 @@ void cameraUpdate() {
       if (stamina >= 100.0f) {
           stamina = 100.0f;
           isExhausted = false; 
+      }
+  }
+
+  // ---- NOVA LÓGICA DE HEAD BOBBING BÍPEDE ----
+  if (isMoving) {
+      // Frequência base muito mais rápida
+      float bobFrequency = speed * 1.5f; 
+      bobPhase += bobFrequency * dt;
+      
+      // Eixo Y (Vertical): Multiplicamos a fase por 2.0f porque o pé bate 2x mais rápido que a transferência de peso
+      bobOffsetY = sin(bobPhase * 2.0f) * 0.08f; 
+      
+      // Eixo X (Lateral): Usa o Cosseno para balançar de forma dessincronizada da subida, transferindo o peso
+      bobOffsetX = cos(bobPhase) * 0.045f; 
+  } else {
+      // Retorno mais abrupto e agressivo para a posição normal quando paramos de andar (15.0f)
+      bobOffsetY += (0.0f - bobOffsetY) * 15.0f * dt; 
+      bobOffsetX += (0.0f - bobOffsetX) * 15.0f * dt; 
+      
+      if (fabs(bobOffsetY) < 0.001f && fabs(bobOffsetX) < 0.001f) {
+          bobOffsetY = 0.0f;
+          bobOffsetX = 0.0f;
+          bobPhase = 0.0f; 
       }
   }
 
