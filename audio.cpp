@@ -4,11 +4,12 @@
 #include "audio.h"
 #include "camera.h"  
 #include "inimigo.h"
+#include "gamestate.h"
+#include "maze.h" // Adicionado para acessar o mazeIsWall()
 #include <GL/glut.h>
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
-#include "gamestate.h"
 
 ma_engine engine;
 ma_sound ambientSound;
@@ -17,7 +18,6 @@ ma_sound breathSound;
 ma_sound heartSound;  
 ma_sound jumpscareSound;
 
-static int lastMonsterSoundTime = 0;
 static bool isInitialized = false;
 
 void audioInit() {
@@ -33,70 +33,104 @@ void audioInit() {
     ma_sound_set_volume(&ambientSound, 0.3f); 
     ma_sound_start(&ambientSound);
 
-    // ---- ALTERADO: Desativa o looping para tocar apenas uma vez ----
     ma_sound_set_looping(&breathSound, MA_FALSE);
     ma_sound_set_looping(&heartSound, MA_FALSE);
     ma_sound_set_volume(&heartSound, 1.4f); 
 
+    // O som do monstro não precisa mais fazer loop, será disparado como um evento
+    ma_sound_set_looping(&monsterSound, MA_FALSE);
+
     isInitialized = true;
-    lastMonsterSoundTime = glutGet(GLUT_ELAPSED_TIME);
 }
 
 void audioUpdate() {
     if (!isInitialized) return;
 
-    // ---- NOVA LÓGICA DE JUMPSCARE NO ÁUDIO ----
     if (state == JUMPSCARE) {
         if (!ma_sound_is_playing(&jumpscareSound)) {
             ma_sound_seek_to_pcm_frame(&jumpscareSound, 0);
             ma_sound_start(&jumpscareSound);
         }
-        // Silencia todos os outros sons bruscamente para focar no grito
         ma_sound_stop(&ambientSound);
         ma_sound_stop(&breathSound);
         ma_sound_stop(&heartSound);
         ma_sound_stop(&monsterSound);
-        return; // Sai da função para não rodar mais nada
+        return; 
     } else {
         if (!ma_sound_is_playing(&ambientSound)) ma_sound_start(&ambientSound);
     }
-    // -------------------------------------------
-
-    // Lógica de distância do Monstro (mantida igual)
-    float dist = sqrt(pow(px - ex, 2) + pow(pz - ez, 2));
-    float dangerRadius = 35.0f; 
-    float volume = (dist < dangerRadius) ? 1.0f - (dist / dangerRadius) : 0.0f;
 
     int now = glutGet(GLUT_ELAPSED_TIME);
-    int randomPause = 3000 + (rand() % 4000); 
-    
-    if (now - lastMonsterSoundTime > randomPause) {
-        if (volume > 0.05f) {
-            ma_sound_set_volume(&monsterSound, volume);
-            ma_sound_seek_to_pcm_frame(&monsterSound, 0); 
-            ma_sound_start(&monsterSound);
+
+    // ---- NOVA LÓGICA: SINAL SONORO DE LINHA DE VISÃO ----
+    float dx = ex - px;
+    float dz = ez - pz;
+    float dist = sqrt(dx * dx + dz * dz);
+    float dangerRadius = 40.0f; // Distância máxima para conseguir enxergá-lo no breu
+
+    static bool wasMonsterVisible = false;
+    static int lastSpottedTime = 0;
+    bool isVisible = false;
+
+    if (dist < dangerRadius) {
+        // Normaliza o vetor para saber a direção real do monstro
+        float dirX = dx / dist;
+        float dirZ = dz / dist;
+
+        // Calcula o vetor para onde a câmera (player) está olhando
+        float camX = cos(yaw);
+        float camZ = sin(yaw);
+
+        // Produto Escalar (Dot Product): Verifica se ele está no cone de visão (FOV) frontal
+        // 0.75f significa um campo de visão cônico de aproximadamente 80 graus
+        if ((dirX * camX + dirZ * camZ) > 0.75f) {
+            
+            // Raycast (Line of Sight): Testa se tem alguma parede entre você e ele
+            bool hitWall = false;
+            float step = 1.0f; // Avança a checagem de 1 em 1 unidade
+            for (float d = 0; d < dist; d += step) {
+                if (mazeIsWall(px + dirX * d, pz + dirZ * d)) {
+                    hitWall = true;
+                    break;
+                }
+            }
+
+            // Se está no FOV e não bateu em nenhuma parede, o monstro está visível!
+            if (!hitWall) {
+                isVisible = true;
+            }
         }
-        lastMonsterSoundTime = now;
     }
 
-    // ---- NOVA LÓGICA DE DISPARO ÚNICO (ONE-SHOT) ----
+    // Toca o som apenas no frame exato em que ele entra na visão (transição false -> true)
+    // Cooldown de 5 segundos impede que o som se repita como uma metralhadora se você chacoalhar o mouse
+    if (isVisible && !wasMonsterVisible) {
+        if (now - lastSpottedTime > 5000) {
+            ma_sound_set_volume(&monsterSound, 1.0f); // Toca no volume máximo para assustar
+            ma_sound_seek_to_pcm_frame(&monsterSound, 0);
+            ma_sound_start(&monsterSound);
+            lastSpottedTime = now;
+        }
+    }
+    wasMonsterVisible = isVisible;
+    // -----------------------------------------------------
+
+    // Lógica de Exaustão (Stamina)
     static bool wasExhausted = false;
 
     if (isExhausted) {
         if (!wasExhausted) {
-            // No frame exato em que a stamina zera, reseta e toca ambos os sons uma vez
             ma_sound_seek_to_pcm_frame(&breathSound, 0);
             ma_sound_seek_to_pcm_frame(&heartSound, 0);
             ma_sound_start(&breathSound);
             ma_sound_start(&heartSound);
-            wasExhausted = true; // Trava o gatilho para não entrar em loop de frames
+            wasExhausted = true; 
         }
     } else {
         if (wasExhausted) {
-            // Se o fôlego se recuperar antes do áudio terminar por completo, corta o som
             ma_sound_stop(&breathSound);
             ma_sound_stop(&heartSound);
-            wasExhausted = false; // Destrava para a próxima exaustão
+            wasExhausted = false; 
         }
     }
 }
@@ -107,5 +141,6 @@ void audioCleanup() {
     ma_sound_uninit(&monsterSound);
     ma_sound_uninit(&breathSound);
     ma_sound_uninit(&heartSound);
+    ma_sound_uninit(&jumpscareSound);
     ma_engine_uninit(&engine);
 }
