@@ -150,6 +150,7 @@ int main(int argc, char **argv) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
   enemyInit();
+  mazeInit();
 
   glutDisplayFunc(display);
   glutReshapeFunc(reshape);
