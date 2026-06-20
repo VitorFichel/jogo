@@ -6,6 +6,74 @@
 #include <cmath>
 #include <queue>
 #include <vector>
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+#include <iostream>
+
+// ---- CONFIGURAÇÕES DO MODELO 3D ----
+// Como os modelos da internet têm tamanhos aleatórios, vai precisar de ajustar isto!
+static const float MODEL_SCALE = 0.01f;       // Aumente se o monstro ficar pequeno, diminua se ficar gigante
+static const float MODEL_Y_OFFSET = 0.0f;     // Ajuste para cima/baixo para os pés tocarem no chão
+static const float MODEL_ROTATION_OFFSET = 180.0f; // Altere para 90, 180 ou -90 se o monstro andar de lado/costas
+static const float MODEL_ROTATION_X = -90.0f;
+
+static GLuint monsterDisplayList = 0;
+
+static void loadMonsterModel() {
+    std::string inputfile = "monstro.obj";
+    tinyobj::ObjReaderConfig reader_config;
+    tinyobj::ObjReader reader;
+
+    if (!reader.ParseFromFile(inputfile, reader_config)) {
+        if (!reader.Error().empty()) printf("Erro ao carregar monstro.obj: %s\n", reader.Error().c_str());
+        return;
+    }
+
+    auto& attrib = reader.GetAttrib();
+    auto& shapes = reader.GetShapes();
+
+    // Compila o modelo na placa gráfica para máxima performance
+    monsterDisplayList = glGenLists(1);
+    glNewList(monsterDisplayList, GL_COMPILE);
+
+    // Material do monstro: Escuro, brilhante e de aspeto "viscoso"
+    GLfloat mat_ambient[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+    GLfloat mat_diffuse[] = { 0.15f, 0.15f, 0.15f, 1.0f }; 
+    GLfloat mat_specular[] = { 0.8f, 0.8f, 0.8f, 1.0f };
+    glMaterialfv(GL_FRONT, GL_AMBIENT, mat_ambient);
+    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
+    glMaterialf(GL_FRONT, GL_SHININESS, 64.0f);
+
+    // Desenha todos os polígonos do .obj
+    for (size_t s = 0; s < shapes.size(); s++) {
+        size_t index_offset = 0;
+        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+            glBegin(GL_POLYGON);
+            for (size_t v = 0; v < fv; v++) {
+                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+                
+                if (idx.normal_index >= 0) {
+                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                    glNormal3f(nx, ny, nz);
+                }
+                
+                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+                glVertex3f(vx, vy, vz);
+            }
+            glEnd();
+            index_offset += fv;
+        }
+    }
+    glEndList();
+}
+// ------------------------------------
+
 
 float ex, ez;
 
@@ -75,13 +143,11 @@ static void buildEnemyTexture() {
 // -------------------------------
 
 void enemyInit() {
-  buildEnemyTexture();
-
-  ex = (LAB_W - 2 + 0.5f) * CELL_SIZE;
-  ez = (LAB_H - 2 + 0.5f) * CELL_SIZE;
+  ex = (LAB_W - 2) * CELL_SIZE + CELL_SIZE / 2.0f;
+  ez = (LAB_H - 2) * CELL_SIZE + CELL_SIZE / 2.0f;
   hasTarget = false;
-  lastRecalcTime = 0;
-  lastUpdateTime = glutGet(GLUT_ELAPSED_TIME);
+  
+  loadMonsterModel(); // <-- ADICIONE ISTO AQUI
 }
 
 static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
@@ -216,44 +282,24 @@ void enemyUpdate() {
 }
 
 void enemyDraw() {
+  if (monsterDisplayList == 0) return; // Segurança caso o .obj não exista
+
   float dx = px - ex;
   float dz = pz - ez;
+  // Calcula o ângulo para o monstro olhar sempre na sua direção
   float angle = atan2(dx, dz) * 180.0f / PI;
 
   glPushMatrix();
-  glTranslatef(ex, 0.0f, ez);
-  glRotatef(angle, 0.0f, 1.0f, 0.0f);
+  
+  // Posiciona, Roda e Escala
+  glTranslatef(ex, MODEL_Y_OFFSET, ez);
+  glRotatef(angle + MODEL_ROTATION_OFFSET, 0.0f, 1.0f, 0.0f);
+  glRotatef(MODEL_ROTATION_X, 1.0f, 0.0f, 0.0f);
+  glScalef(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
 
-  // sprite "auto-iluminado": desliga GL_LIGHTING pra textura aparecer com as
-  // cores cruas (é isso que faz os olhos vermelhos brilharem mesmo fora do
-  // cone da lanterna — efeito clássico de "algo te observando no escuro")
-  glDisable(GL_LIGHTING);
-  glEnable(GL_TEXTURE_2D);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glDepthMask(GL_FALSE);
-
-  glColor3f(1.0f, 1.0f, 1.0f);
-  glBindTexture(GL_TEXTURE_2D, enemyTexture);
-
-  float halfWidth = 0.5f;
-  float height = 1.7f;
-
-  glBegin(GL_QUADS);
-  glTexCoord2f(0.0f, 0.0f);
-  glVertex3f(-halfWidth, 0.0f, 0.0f);
-  glTexCoord2f(1.0f, 0.0f);
-  glVertex3f(halfWidth, 0.0f, 0.0f);
-  glTexCoord2f(1.0f, 1.0f);
-  glVertex3f(halfWidth, height, 0.0f);
-  glTexCoord2f(0.0f, 1.0f);
-  glVertex3f(-halfWidth, height, 0.0f);
-  glEnd();
-
-  glDepthMask(GL_TRUE);
-  glDisable(GL_BLEND);
-  glDisable(GL_TEXTURE_2D);
+  // Garante que a luz reage à carne do monstro
   glEnable(GL_LIGHTING);
-
+  glCallList(monsterDisplayList);
+  
   glPopMatrix();
 }
