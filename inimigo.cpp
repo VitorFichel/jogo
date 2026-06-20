@@ -171,13 +171,26 @@ void enemyUpdate() {
   float deltaSeconds = (now - lastUpdateTime) / 1000.0f;
   lastUpdateTime = now;
 
-  if (deltaSeconds > 0.25f)
-    deltaSeconds = 0.25f;
+  if (deltaSeconds > 0.25f) deltaSeconds = 0.25f;
 
   float pdx = px - ex, pdz = pz - ez;
   float playerDist = sqrt(pdx * pdx + pdz * pdz);
-  if (playerDist < 0.6f)
-    state = LOST;
+  
+  // ---- GATILHO DO JUMPSCARE ----
+  if (playerDist < 0.6f && state == PLAYING) {
+    state = JUMPSCARE;
+    jumpscareStartTime = now;
+
+    // Força a câmera do jogador a olhar fixamente para o monstro
+    yaw = atan2(ez - pz, ex - px);
+    pitch = 0.2f; // Olha levemente para cima (deixa o monstro imponente)
+
+    // Teletransporta o monstro colado na tela (0.3 unidades de distância)
+    ex = px + cos(yaw) * 0.3f;
+    ez = pz + sin(yaw) * 0.3f;
+    return; // Para a execução para ele não recalcular rota
+  }
+  // ------------------------------
 
   if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
     recalcPath();

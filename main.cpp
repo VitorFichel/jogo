@@ -8,10 +8,20 @@
 
 void display() {
   if (state == PLAYING) {
-    cameraUpdate(); // Isso faz o player se mover todo frame!
+    cameraUpdate(); 
     enemyUpdate();
-    audioUpdate(); // Atualiza o áudio do monstro todo frame
   }
+
+  // ---- CONTROLE DE TEMPO DO JUMPSCARE ----
+  // Espera 1500 milissegundos (1.5s) de susto antes de dar a tela de morte real
+  if (state == JUMPSCARE) {
+      if (glutGet(GLUT_ELAPSED_TIME) - jumpscareStartTime > 1500) {
+          state = LOST;
+      }
+  }
+
+  // O áudio agora atualiza fora dos ifs para continuar tocando durante a morte
+  audioUpdate(); 
 
   // 1. Desenha o mundo 3D
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -20,8 +30,11 @@ void display() {
   cameraApply();
   cameraApplyLight(); 
 
-  mazeDraw();
-  enemyDraw();
+  // Só desenha o labirinto e o monstro se estiver vivo ou tomando o susto
+  if (state == PLAYING || state == JUMPSCARE) {
+      mazeDraw();
+      enemyDraw();
+  }
 
   // 2. Entra no modo 2D para desenhar a Interface (HUD e Telas Finais)
   glMatrixMode(GL_PROJECTION);
@@ -35,18 +48,16 @@ void display() {
   glDisable(GL_DEPTH_TEST);
 
   if (state == PLAYING) {
-    // ---- HUD: BARRA DE ESTAMINA DISCRETA E CENTRALIZADA EM BAIXO ----
+    // ---- HUD DA ESTAMINA ----
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Fundo da barra (Cinza escuro, fina, centralizada)
     glColor4f(0.15f, 0.15f, 0.15f, 0.6f);
     glBegin(GL_QUADS);
     glVertex2f(300, 20); glVertex2f(500, 20); 
     glVertex2f(500, 24); glVertex2f(300, 24);
     glEnd();
 
-    // Preenchimento da barra (Fica vermelha se exausto, senão cinza fosco)
     if (isExhausted) glColor4f(0.7f, 0.0f, 0.0f, 0.6f);
     else glColor4f(0.6f, 0.6f, 0.6f, 0.6f);
 
@@ -56,12 +67,12 @@ void display() {
     glEnd();
 
     glDisable(GL_BLEND);
-    // Todos os textos de comandos foram removidos para maior imersão
-    
-  } else {
+  } else if (state == WON || state == LOST) {
     // ---- TELA DE VITÓRIA OU DERROTA ----
+    // Nota: A tela de GameOver NÃO desenha durante o estado JUMPSCARE, 
+    // deixando a tela limpa para focar só no monstro e no grito.
     glColor3f(1, 0, 0);
-    if (state == WON) glColor3f(0.0f, 1.0f, 0.2f); // Fica verde se vencer
+    if (state == WON) glColor3f(0.0f, 1.0f, 0.2f); 
 
     glRasterPos2i(330, 300);
     const char *msg = (state == LOST) ? "GAME OVER - aperte R" : "VOCE VENCEU - aperte R";
@@ -87,6 +98,7 @@ void keyboard(unsigned char key, int x, int y) {
       for (int i=0; i<256; i++) keys[i] = false; 
       return; 
   }
+  // Bloqueia a movimentação durante o jumpscare
   if (state == PLAYING) cameraKeyDown(key);
 }
 
