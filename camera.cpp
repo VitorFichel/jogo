@@ -3,13 +3,20 @@
 #include "maze.h"
 #include <GL/glut.h>
 #include <cmath>
+#include <cstdlib> // Adicionado para gerar os números aleatórios (rand)
 
 float px = 1.5f * CELL_SIZE, py = 1.0f, pz = 1.5f * CELL_SIZE;
 float yaw = -PI / 2;
 float pitch = 0.0f;
 
-float stamina = 100.0f;       // Inicia com fôlego total
-bool isExhausted = false;     // Inicia descansado
+float stamina = 100.0f;
+bool isExhausted = false;
+
+// ---- VARIÁVEIS DA LANTERNA DEFEITUOSA ----
+float flashlightIntensity = 1.0f;
+static int nextFlickerTime = 0;
+static int flickerEndTime = 0;
+// ------------------------------------------
 
 static const float PLAYER_RADIUS = 0.2f;
 
@@ -36,6 +43,10 @@ void cameraApplyLight() {
   GLfloat lightDir[] = {dx, dy, dz};
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
   glLightfv(GL_LIGHT0, GL_SPOT_DIRECTION, lightDir);
+
+  // Aplica a falha elétrica na intensidade da luz dinamicamente
+  GLfloat lightDiffuse[] = {1.0f * flashlightIntensity, 0.95f * flashlightIntensity, 0.8f * flashlightIntensity, 1.0f};
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
 }
 
 void cameraMouseMotion(int x, int y) {
@@ -94,13 +105,11 @@ static void clampToMaze(float &x, float &z) {
   if (z > maxZ) z = maxZ;
 }
 
-// ---- LÓGICA DE MOVIMENTO CONTÍNUO CORRIGIDA ----
 bool keys[256] = {false};
-bool isSprinting = false;
 static int lastCameraTime = 0;
 
 void cameraKeyDown(unsigned char key) {
-  if (key >= 'A' && key <= 'Z') key += 32; // Converte maiúscula para minúscula
+  if (key >= 'A' && key <= 'Z') key += 32; 
   keys[key] = true;
 }
 
@@ -119,33 +128,51 @@ void cameraUpdate() {
   if (dt <= 0.001f) return; 
   if (dt > 0.1f) dt = 0.1f;
 
-  // ---- NOVA LÓGICA DE CORRIDA COM ESTAMINA ----
+  // ---- LÓGICA DA LANTERNA DEFEITUOSA ----
+  if (now > nextFlickerTime) {
+      int chance = rand() % 1000;
+      if (chance < 15) { 
+          // 1.5% de probabilidade de dar mau contacto rápido (flicker)
+          flashlightIntensity = (rand() % 50) / 100.0f; 
+          flickerEndTime = now + 50 + (rand() % 150);
+      } else if (chance < 18) { 
+          // 0.3% de probabilidade de apagar completamente!
+          flashlightIntensity = 0.0f;
+          flickerEndTime = now + 1000 + (rand() % 2500); // Fica no escuro de 1s a 3.5s
+      }
+      nextFlickerTime = now + 100; // Sorteia de novo a cada 100ms
+  }
+
+  // Restaura a luz se o tempo da falha já tiver passado
+  if (now > flickerEndTime && flashlightIntensity != 1.0f) {
+      flashlightIntensity = 1.0f; 
+  }
+  // ---------------------------------------
+
+  // ---- LÓGICA DE CORRIDA COM ESTAMINA ----
   float baseSpeed = 4.5f;
   float sprintSpeed = 12.0f; 
   float exhaustedSpeed = 3.0f; 
   float speed = baseSpeed;
   
-  // Verifica se o jogador está tentando se mover
   bool isMoving = (keys['w'] || keys['s'] || keys['a'] || keys['d']);
 
   if (keys[' '] && !isExhausted && isMoving) {
       speed = sprintSpeed;
-      stamina -= 25.0f * dt; // Drena tudo em 4 segundos de corrida
+      stamina -= 25.0f * dt; 
       if (stamina <= 0.0f) {
           stamina = 0.0f;
-          isExhausted = true; // Bateu o cansaço
+          isExhausted = true; 
       }
   } else {
-      if (isExhausted) speed = exhaustedSpeed; // Punição de velocidade
+      if (isExhausted) speed = exhaustedSpeed; 
       
-      stamina += 10.0f * dt; // Demora 10 segundos para recuperar o fôlego total
+      stamina += 10.0f * dt; 
       if (stamina >= 100.0f) {
           stamina = 100.0f;
-          isExhausted = false; // Só volta a correr quando recuperar 100%
+          isExhausted = false; 
       }
   }
-
-  // (A linha problemática que redeclarava o speed foi removida daqui)
 
   float dx = cos(yaw), dz = sin(yaw);
   float newPx = px, newPz = pz;
