@@ -57,8 +57,8 @@ GLuint loadTexture(const char* filename) {
 }
 
 void mazeInit() {
-    wallTex = loadTexture("wall.jpg");
-    floorTex = loadTexture("floor.jpg");
+    wallTex = loadTexture("assets/textures/wall.jpg");
+    floorTex = loadTexture("assets/textures/floor");
 }
 // -----------------------------
 

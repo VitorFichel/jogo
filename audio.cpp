@@ -23,11 +23,11 @@ static bool isInitialized = false;
 void audioInit() {
     if (ma_engine_init(NULL, &engine) != MA_SUCCESS) return;
 
-    ma_sound_init_from_file(&engine, "ambiente.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &ambientSound);
-    ma_sound_init_from_file(&engine, "monstro.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &monsterSound);
-    ma_sound_init_from_file(&engine, "respiracao.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &breathSound);
-    ma_sound_init_from_file(&engine, "batimentos.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &heartSound);
-    ma_sound_init_from_file(&engine, "jumpscare.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &jumpscareSound);
+    ma_sound_init_from_file(&engine, "assets/audio/ambiente.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &ambientSound);
+    ma_sound_init_from_file(&engine, "assets/audio/monstro.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &monsterSound);
+    ma_sound_init_from_file(&engine, "assets/audio/respiracao.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &breathSound);
+    ma_sound_init_from_file(&engine, "assets/audio/batimentos.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &heartSound);
+    ma_sound_init_from_file(&engine, "assets/audio/jumpscare.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &jumpscareSound);
 
     ma_sound_set_looping(&ambientSound, MA_TRUE);
     ma_sound_set_volume(&ambientSound, 0.3f); 

@@ -12,15 +12,15 @@
 
 // ---- CONFIGURAÇÕES DO MODELO 3D ----
 // Como os modelos da internet têm tamanhos aleatórios, vai precisar de ajustar isto!
-static const float MODEL_SCALE = 0.01f;       // Aumente se o monstro ficar pequeno, diminua se ficar gigante
+static const float MODEL_SCALE = 0.04f;       // Aumente se o monstro ficar pequeno, diminua se ficar gigante
 static const float MODEL_Y_OFFSET = 0.0f;     // Ajuste para cima/baixo para os pés tocarem no chão
-static const float MODEL_ROTATION_OFFSET = 180.0f; // Altere para 90, 180 ou -90 se o monstro andar de lado/costas
+static const float MODEL_ROTATION_OFFSET = 90.0f; // Altere para 90, 180 ou -90 se o monstro andar de lado/costas
 static const float MODEL_ROTATION_X = -90.0f;
 
 static GLuint monsterDisplayList = 0;
 
 static void loadMonsterModel() {
-    std::string inputfile = "monstro.obj";
+    std::string inputfile = "assets/models/monstro.obj";
     tinyobj::ObjReaderConfig reader_config;
     tinyobj::ObjReader reader;
 
