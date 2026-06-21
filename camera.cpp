@@ -12,13 +12,13 @@ float pitch = 0.0f;
 float stamina = 100.0f;
 bool isExhausted = false;
 
-// ---- VARIÁVEIS DE HEAD BOBBING (Caminhada Realista) ----
+// ---- VARIÁVEIS DE HEAD BOBBING ----
 static float bobPhase = 0.0f;
-static float bobOffsetY = 0.0f; // Sobe e desce
-static float bobOffsetX = 0.0f; // Direita e esquerda
-// ---------------------------------------------------------
+static float bobOffsetY = 0.0f; 
+static float bobOffsetX = 0.0f; 
+// -----------------------------------
 
-// ---- VARIÁVEIS DA LANTERNA DEFEITUOSA ----
+// ---- VARIÁVEIS DA LANTERNA ----
 float flashlightIntensity = 1.0f;
 static int nextSequenceCheckTime = 0; 
 static int currentStageEndTime = 0;    
@@ -31,7 +31,7 @@ enum FlickerStage {
     APAGAO_LONGO 
 };
 static FlickerStage currentStage = NORMAL;
-// ------------------------------------------
+// -------------------------------
 
 static const float PLAYER_RADIUS = 0.2f;
 
@@ -49,11 +49,9 @@ void cameraApply() {
   float dx, dy, dz;
   getViewDir(dx, dy, dz);
   
-  // Calcula o Vetor Direita (Right Vector) a partir do Yaw para fazer o balanço lateral
   float rx = -sin(yaw);
   float rz = cos(yaw);
 
-  // Aplica os offsets verticais e horizontais na câmara
   float finalPx = px + rx * bobOffsetX;
   float finalPy = py + bobOffsetY;
   float finalPz = pz + rz * bobOffsetX;
@@ -74,7 +72,6 @@ void cameraApplyLight() {
   float finalPy = py + bobOffsetY;
   float finalPz = pz + rz * bobOffsetX;
 
-  // A luz acompanha perfeitamente a mão com o balanço realista
   GLfloat lightPos[] = {finalPx, finalPy, finalPz, 1.0f};
   GLfloat lightDir[] = {dx, dy, dz};
   glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
@@ -123,21 +120,7 @@ void cameraMouseMotion(int x, int y) {
 }
 
 static bool checkCollision(float x, float z) {
-  return mazeIsWall(x - PLAYER_RADIUS, z - PLAYER_RADIUS) ||
-         mazeIsWall(x + PLAYER_RADIUS, z - PLAYER_RADIUS) ||
-         mazeIsWall(x - PLAYER_RADIUS, z + PLAYER_RADIUS) ||
-         mazeIsWall(x + PLAYER_RADIUS, z + PLAYER_RADIUS);
-}
-
-static void clampToMaze(float &x, float &z) {
-  float minCoord = PLAYER_RADIUS;
-  float maxX = LAB_W * CELL_SIZE - PLAYER_RADIUS;
-  float maxZ = LAB_H * CELL_SIZE - PLAYER_RADIUS;
-
-  if (x < minCoord) x = minCoord;
-  if (x > maxX) x = maxX;
-  if (z < minCoord) z = minCoord;
-  if (z > maxZ) z = maxZ;
+  return checkCollisionAABB(x, z, PLAYER_RADIUS);
 }
 
 bool keys[256] = {false};
@@ -163,7 +146,6 @@ void cameraUpdate() {
   if (dt <= 0.001f) return; 
   if (dt > 0.1f) dt = 0.1f;
 
-  // ---- MÁQUINA DE ESTADOS DA LANTERNA ----
   if (currentStage != NORMAL && now > currentStageEndTime) {
       switch (currentStage) {
           case PISCA_1_OFF: currentStage = PISCA_1_ON; flashlightIntensity = 1.0f; currentStageEndTime = now + 40 + (rand() % 40); break;
@@ -186,7 +168,6 @@ void cameraUpdate() {
       nextSequenceCheckTime = now + 200; 
   }
 
-  // ---- LÓGICA DE CORRIDA E ESTAMINA ----
   float baseSpeed = 4.5f;
   float sprintSpeed = 12.0f; 
   float exhaustedSpeed = 3.0f; 
@@ -203,7 +184,6 @@ void cameraUpdate() {
       }
   } else {
       if (isExhausted) speed = exhaustedSpeed; 
-      
       stamina += 10.0f * dt; 
       if (stamina >= 100.0f) {
           stamina = 100.0f;
@@ -211,22 +191,14 @@ void cameraUpdate() {
       }
   }
 
-  // ---- NOVA LÓGICA DE HEAD BOBBING BÍPEDE ----
   if (isMoving) {
-      // Frequência base muito mais rápida
       float bobFrequency = speed * 1.5f; 
       bobPhase += bobFrequency * dt;
-      
-      // Eixo Y (Vertical): Multiplicamos a fase por 2.0f porque o pé bate 2x mais rápido que a transferência de peso
       bobOffsetY = sin(bobPhase * 2.0f) * 0.08f; 
-      
-      // Eixo X (Lateral): Usa o Cosseno para balançar de forma dessincronizada da subida, transferindo o peso
       bobOffsetX = cos(bobPhase) * 0.045f; 
   } else {
-      // Retorno mais abrupto e agressivo para a posição normal quando paramos de andar (15.0f)
       bobOffsetY += (0.0f - bobOffsetY) * 15.0f * dt; 
       bobOffsetX += (0.0f - bobOffsetX) * 15.0f * dt; 
-      
       if (fabs(bobOffsetY) < 0.001f && fabs(bobOffsetX) < 0.001f) {
           bobOffsetY = 0.0f;
           bobOffsetX = 0.0f;
@@ -245,9 +217,7 @@ void cameraUpdate() {
   if (!checkCollision(newPx, pz)) px = newPx;
   if (!checkCollision(px, newPz)) pz = newPz;
 
-  clampToMaze(px, pz);
-
-  if (mazeIsExit(px, pz)) {
+  if (checkExitAABB(px, pz)) {
     state = WON;
   }
 }

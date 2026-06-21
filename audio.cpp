@@ -85,11 +85,12 @@ void audioUpdate() {
         // 0.75f significa um campo de visão cônico de aproximadamente 80 graus
         if ((dirX * camX + dirZ * camZ) > 0.75f) {
             
-            // Raycast (Line of Sight): Testa se tem alguma parede entre você e ele
+            // Raycast (Line of Sight): Testa se tem alguma parede usando o novo sistema AABB
             bool hitWall = false;
             float step = 1.0f; // Avança a checagem de 1 em 1 unidade
             for (float d = 0; d < dist; d += step) {
-                if (mazeIsWall(px + dirX * d, pz + dirZ * d)) {
+                // Usa o AABB com um raio quase zero (0.05f) simulando o olhar
+                if (checkCollisionAABB(px + dirX * d, pz + dirZ * d, 0.05f)) {
                     hitWall = true;
                     break;
                 }
