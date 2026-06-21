@@ -217,6 +217,9 @@ void cameraUpdate() {
   if (!checkCollision(newPx, pz)) px = newPx;
   if (!checkCollision(px, newPz)) pz = newPz;
 
+  // Atualiza lógica de portas e chave
+  updateInteractables(px, pz, PLAYER_RADIUS);
+
   if (checkExitAABB(px, pz)) {
     state = WON;
   }
