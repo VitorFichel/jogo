@@ -11,10 +11,9 @@
 #include <iostream>
 
 // ---- CONFIGURAÇÕES DO MODELO 3D ----
-// Como os modelos da internet têm tamanhos aleatórios, vai precisar de ajustar isto!
-static const float MODEL_SCALE = 0.04f;       // Aumente se o monstro ficar pequeno, diminua se ficar gigante
-static const float MODEL_Y_OFFSET = 0.0f;     // Ajuste para cima/baixo para os pés tocarem no chão
-static const float MODEL_ROTATION_OFFSET = 90.0f; // Altere para 90, 180 ou -90 se o monstro andar de lado/costas
+static const float MODEL_SCALE = 0.04f;       
+static const float MODEL_Y_OFFSET = 0.0f;     
+static const float MODEL_ROTATION_OFFSET = 90.0f; 
 static const float MODEL_ROTATION_X = -90.0f;
 
 static GLuint monsterDisplayList = 0;
@@ -32,11 +31,10 @@ static void loadMonsterModel() {
     auto& attrib = reader.GetAttrib();
     auto& shapes = reader.GetShapes();
 
-    // Compila o modelo na placa gráfica para máxima performance
     monsterDisplayList = glGenLists(1);
     glNewList(monsterDisplayList, GL_COMPILE);
 
-    // Material do monstro: Escuro, brilhante e de aspeto "viscoso"
+    // Material do monstro: Escuro, brilhante e de aspeto "viscoso" (Textura removida)
     GLfloat mat_ambient[] = { 0.0f, 0.0f, 0.0f, 1.0f };
     GLfloat mat_diffuse[] = { 0.15f, 0.15f, 0.15f, 1.0f }; 
     GLfloat mat_specular[] = { 0.8f, 0.8f, 0.8f, 1.0f };
@@ -45,7 +43,6 @@ static void loadMonsterModel() {
     glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
     glMaterialf(GL_FRONT, GL_SHININESS, 64.0f);
 
-    // Desenha todos os polígonos do .obj
     for (size_t s = 0; s < shapes.size(); s++) {
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
@@ -72,96 +69,102 @@ static void loadMonsterModel() {
     }
     glEndList();
 }
-// ------------------------------------
-
 
 float ex, ez;
 
-static const float ENEMY_SPEED = 1.0f;          // unidades de mundo por SEGUNDO (não por frame)
-static const int RECALC_INTERVAL_MS = 500;      // recalcula rota a cada 0.5s
+// ---- MÁQUINA DE ESTADOS DA IA ----
+enum AIState { PATROL, CHASE };
+AIState aiState = PATROL;
+
+float patrolDestX = 0, patrolDestZ = 0;
+float lastKnownX = 0, lastKnownZ = 0;
+
+static const float PATROL_SPEED = 2.5f; 
+static const float CHASE_SPEED = 5.2f;  
+
+static const int RECALC_INTERVAL_MS = 300;      
 static int lastRecalcTime = 0;
 static int lastUpdateTime = 0;
 
 static float targetX, targetZ;
 static bool hasTarget = false;
+// ----------------------------------
 
-// ---- billboard do inimigo ----
-// textura gerada por código (silhueta encapuzada + olhos vermelhos), sem
-// depender de nenhum arquivo .png nem biblioteca de imagem
-static const int ENEMY_TEX_SIZE = 64;
-static GLuint enemyTexture = 0;
-static bool enemyTextureReady = false;
+// ---- SISTEMA DE VISÃO (RAYCASTING) ----
+bool checkLineOfSight(float x1, float z1, float x2, float z2) {
+    float dx = x2 - x1;
+    float dz = z2 - z1;
+    float dist = sqrt(dx*dx + dz*dz);
+    
+    if (dist > 25.0f) return false; 
 
-static void buildEnemyTexture() {
-  if (enemyTextureReady)
-    return;
+    int steps = (int)(dist / 0.2f);
+    if (steps == 0) return true;
 
-  std::vector<unsigned char> pixels(ENEMY_TEX_SIZE * ENEMY_TEX_SIZE * 4, 0);
+    float stepX = dx / steps;
+    float stepZ = dz / steps;
+    float cx = x1, cz = z1;
 
-  for (int y = 0; y < ENEMY_TEX_SIZE; y++) {
-    for (int x = 0; x < ENEMY_TEX_SIZE; x++) {
-      float u = (x + 0.5f) / ENEMY_TEX_SIZE - 0.5f;
-      float v = (y + 0.5f) / ENEMY_TEX_SIZE;
-
-      float bodyHalfWidth = 0.10f + 0.32f * (1.0f - v);
-      bool insideBody = fabs(u) < bodyHalfWidth && v > 0.04f && v < 0.96f;
-
-      unsigned char r = 0, g = 0, b = 0, a = 0;
-      if (insideBody) {
-        float edgeDist = bodyHalfWidth - fabs(u);
-        a = (unsigned char)(edgeDist * 900.0f > 255.0f ? 255 : edgeDist * 900.0f);
-        r = 12; g = 10; b = 15;
-      }
-
-      float eyeY = 0.78f, eyeDX = 0.05f, eyeR = 0.035f;
-      float d1 = sqrt((u + eyeDX) * (u + eyeDX) + (v - eyeY) * (v - eyeY));
-      float d2 = sqrt((u - eyeDX) * (u - eyeDX) + (v - eyeY) * (v - eyeY));
-      if (d1 < eyeR || d2 < eyeR) {
-        r = 220; g = 25; b = 15;
-        a = 255;
-      }
-
-      int idx = (y * ENEMY_TEX_SIZE + x) * 4;
-      pixels[idx + 0] = r;
-      pixels[idx + 1] = g;
-      pixels[idx + 2] = b;
-      pixels[idx + 3] = a;
+    for (int i = 0; i < steps; i++) {
+        cx += stepX;
+        cz += stepZ;
+        
+        for (const auto& box : worldAABBs) {
+            if (!box.active) continue;
+            // Visão bloqueada por paredes (1) e portas (5, 6)
+            if (box.type == 1 || box.type == 5 || box.type == 6) {
+                if (cx > box.minX && cx < box.maxX && cz > box.minZ && cz < box.maxZ) {
+                    return false; 
+                }
+            }
+        }
     }
-  }
-
-  glGenTextures(1, &enemyTexture);
-  glBindTexture(GL_TEXTURE_2D, enemyTexture);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ENEMY_TEX_SIZE, ENEMY_TEX_SIZE, 0,
-               GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-
-  enemyTextureReady = true;
+    return true; 
 }
-// -------------------------------
+// ---------------------------------------
+
+// ---- INTELIGÊNCIA DE RONDAR ----
+void pickPatrolPoint() {
+    int pCol = (int)(px / CELL_SIZE);
+    int pRow = (int)(pz / CELL_SIZE);
+    int targetC = pCol, targetR = pRow;
+
+    for (int i = 0; i < 50; i++) {
+        int offC = (rand() % 15) - 7; 
+        int offR = (rand() % 15) - 7;
+        int c = pCol + offC;
+        int r = pRow + offR;
+
+        if (r > 0 && r < LAB_H-1 && c > 0 && c < LAB_W-1 && maze[r][c] == 0) {
+            if (c != (int)(ex/CELL_SIZE) || r != (int)(ez/CELL_SIZE)) {
+                targetC = c;
+                targetR = r;
+                break;
+            }
+        }
+    }
+    patrolDestX = (targetC + 0.5f) * CELL_SIZE;
+    patrolDestZ = (targetR + 0.5f) * CELL_SIZE;
+}
+// --------------------------------
 
 void enemyInit() {
   ex = (LAB_W - 2) * CELL_SIZE + CELL_SIZE / 2.0f;
   ez = (LAB_H - 2) * CELL_SIZE + CELL_SIZE / 2.0f;
-  hasTarget = false;
   
-  loadMonsterModel(); // <-- ADICIONE ISTO AQUI
+  aiState = PATROL;
+  hasTarget = false;
+  pickPatrolPoint(); 
+  
+  loadMonsterModel(); 
 }
 
-static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
-                         int &outRow, int &outCol) {
-  if (startRow < 0 || startRow >= LAB_H || startCol < 0 || startCol >= LAB_W ||
-      goalRow < 0 || goalRow >= LAB_H || goalCol < 0 || goalCol >= LAB_W)
-    return false;
-
-  if (startRow == goalRow && startCol == goalCol)
-    return false;
+static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, int &outRow, int &outCol) {
+  if (startRow < 0 || startRow >= LAB_H || startCol < 0 || startCol >= LAB_W || goalRow < 0 || goalRow >= LAB_H || goalCol < 0 || goalCol >= LAB_W) return false;
+  if (startRow == goalRow && startCol == goalCol) return false;
 
   std::vector<std::vector<bool>> visited(LAB_H, std::vector<bool>(LAB_W, false));
-  std::vector<std::vector<std::pair<int, int>>> cameFrom(
-      LAB_H, std::vector<std::pair<int, int>>(LAB_W, {-1, -1}));
+  std::vector<std::vector<std::pair<int, int>>> cameFrom(LAB_H, std::vector<std::pair<int, int>>(LAB_W, {-1, -1}));
 
   std::queue<std::pair<int, int>> q;
   q.push({startRow, startCol});
@@ -179,22 +182,18 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
       int nr = row + dRow[dir];
       int nc = col + dCol[dir];
 
-      if (nr < 0 || nr >= LAB_H || nc < 0 || nc >= LAB_W)
-        continue;
-      if (visited[nr][nc] || maze[nr][nc] == 1)
-        continue;
+      if (nr < 0 || nr >= LAB_H || nc < 0 || nc >= LAB_W) continue;
+      if (visited[nr][nc] || maze[nr][nc] == 1) continue;
 
       visited[nr][nc] = true;
       cameFrom[nr][nc] = {row, col};
       q.push({nr, nc});
 
-      if (nr == goalRow && nc == goalCol)
-        found = true;
+      if (nr == goalRow && nc == goalCol) found = true;
     }
   }
 
-  if (!visited[goalRow][goalCol])
-    return false;
+  if (!visited[goalRow][goalCol]) return false;
 
   int row = goalRow, col = goalCol;
   while (cameFrom[row][col] != std::make_pair(startRow, startCol)) {
@@ -208,21 +207,21 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol,
   return true;
 }
 
-static void recalcPath() {
+static void recalcPathTo(float destX, float destZ) {
   int enemyCol = (int)(ex / CELL_SIZE);
   int enemyRow = (int)(ez / CELL_SIZE);
-  int playerCol = (int)(px / CELL_SIZE);
-  int playerRow = (int)(pz / CELL_SIZE);
+  int goalCol = (int)(destX / CELL_SIZE);
+  int goalRow = (int)(destZ / CELL_SIZE);
 
-  if (enemyRow == playerRow && enemyCol == playerCol) {
-    targetX = px;
-    targetZ = pz;
+  if (enemyRow == goalRow && enemyCol == goalCol) {
+    targetX = destX;
+    targetZ = destZ;
     hasTarget = true;
     return;
   }
 
   int nextRow, nextCol;
-  if (bfsNextStep(enemyRow, enemyCol, playerRow, playerCol, nextRow, nextCol)) {
+  if (bfsNextStep(enemyRow, enemyCol, goalRow, goalCol, nextRow, nextCol)) {
     targetX = (nextCol + 0.5f) * CELL_SIZE;
     targetZ = (nextRow + 0.5f) * CELL_SIZE;
     hasTarget = true;
@@ -236,41 +235,60 @@ void enemyUpdate() {
 
   float deltaSeconds = (now - lastUpdateTime) / 1000.0f;
   lastUpdateTime = now;
-
   if (deltaSeconds > 0.25f) deltaSeconds = 0.25f;
 
   float pdx = px - ex, pdz = pz - ez;
   float playerDist = sqrt(pdx * pdx + pdz * pdz);
   
-  // ---- GATILHO DO JUMPSCARE ----
   if (playerDist < 0.6f && state == PLAYING) {
     state = JUMPSCARE;
     jumpscareStartTime = now;
-
-    // Força a câmera do jogador a olhar fixamente para o monstro
     yaw = atan2(ez - pz, ex - px);
-    pitch = 0.2f; // Olha levemente para cima (deixa o monstro imponente)
-
-    // Teletransporta o monstro colado na tela (0.3 unidades de distância)
+    pitch = 0.2f; 
     ex = px + cos(yaw) * 0.3f;
     ez = pz + sin(yaw) * 0.3f;
-    return; // Para a execução para ele não recalcular rota
+    return; 
   }
-  // ------------------------------
+
+  bool canSeePlayer = checkLineOfSight(ex, ez, px, pz);
+
+  // ---- TRANSIÇÃO DE ESTADOS DA IA ----
+  if (aiState == PATROL) {
+      if (canSeePlayer) {
+          aiState = CHASE;
+          lastKnownX = px; 
+          lastKnownZ = pz;
+      } else {
+          float distToPatrol = sqrt(pow(patrolDestX - ex, 2) + pow(patrolDestZ - ez, 2));
+          if (distToPatrol < 0.5f) pickPatrolPoint();
+      }
+  } else if (aiState == CHASE) {
+      if (canSeePlayer) {
+          lastKnownX = px;
+          lastKnownZ = pz;
+      } else {
+          float distToLast = sqrt(pow(lastKnownX - ex, 2) + pow(lastKnownZ - ez, 2));
+          if (distToLast < 0.5f) {
+              aiState = PATROL;
+              pickPatrolPoint();
+          }
+      }
+  }
 
   if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
-    recalcPath();
+    if (aiState == PATROL) recalcPathTo(patrolDestX, patrolDestZ);
+    else recalcPathTo(lastKnownX, lastKnownZ);
     lastRecalcTime = now;
   }
 
-  if (!hasTarget)
-    return;
+  if (!hasTarget) return;
 
   float dx = targetX - ex;
   float dz = targetZ - ez;
   float dist = sqrt(dx * dx + dz * dz);
 
-  float step = ENEMY_SPEED * deltaSeconds;
+  float currentSpeed = (aiState == CHASE) ? CHASE_SPEED : PATROL_SPEED;
+  float step = currentSpeed * deltaSeconds;
 
   if (dist > step) {
     ex += (dx / dist) * step;
@@ -282,24 +300,19 @@ void enemyUpdate() {
 }
 
 void enemyDraw() {
-  if (monsterDisplayList == 0) return; // Segurança caso o .obj não exista
+  if (monsterDisplayList == 0) return; 
 
   float dx = px - ex;
   float dz = pz - ez;
-  // Calcula o ângulo para o monstro olhar sempre na sua direção
   float angle = atan2(dx, dz) * 180.0f / PI;
 
   glPushMatrix();
-  
-  // Posiciona, Roda e Escala
   glTranslatef(ex, MODEL_Y_OFFSET, ez);
   glRotatef(angle + MODEL_ROTATION_OFFSET, 0.0f, 1.0f, 0.0f);
   glRotatef(MODEL_ROTATION_X, 1.0f, 0.0f, 0.0f);
   glScalef(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
 
-  // Garante que a luz reage à carne do monstro
   glEnable(GL_LIGHTING);
   glCallList(monsterDisplayList);
-  
   glPopMatrix();
 }
