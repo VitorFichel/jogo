@@ -9,6 +9,7 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 #include <iostream>
+#include "audio.h"
 
 // ---- CONFIGURAÇÕES DO MODELO 3D ----
 static const float MODEL_SCALE = 0.04f;       
@@ -96,7 +97,7 @@ bool checkLineOfSight(float x1, float z1, float x2, float z2) {
     float dz = z2 - z1;
     float dist = sqrt(dx*dx + dz*dz);
     
-    if (dist > 25.0f) return false; 
+    if (dist > 12.0f) return false; 
 
     int steps = (int)(dist / 0.2f);
     if (steps == 0) return true;
@@ -125,17 +126,16 @@ bool checkLineOfSight(float x1, float z1, float x2, float z2) {
 
 // ---- INTELIGÊNCIA DE RONDAR ----
 void pickPatrolPoint() {
-    int pCol = (int)(px / CELL_SIZE);
-    int pRow = (int)(pz / CELL_SIZE);
-    int targetC = pCol, targetR = pRow;
+    int targetC = (int)(ex / CELL_SIZE);
+    int targetR = (int)(ez / CELL_SIZE);
 
     for (int i = 0; i < 50; i++) {
-        int offC = (rand() % 15) - 7; 
-        int offR = (rand() % 15) - 7;
-        int c = pCol + offC;
-        int r = pRow + offR;
+        // Sorteia uma coordenada em QUALQUER lugar da matriz do casarão
+        int c = 1 + (rand() % (LAB_W - 2));
+        int r = 1 + (rand() % (LAB_H - 2));
 
-        if (r > 0 && r < LAB_H-1 && c > 0 && c < LAB_W-1 && maze[r][c] == 0) {
+        // Se o lugar for chão livre (0) e não for onde ele já está
+        if (maze[r][c] == 0) {
             if (c != (int)(ex/CELL_SIZE) || r != (int)(ez/CELL_SIZE)) {
                 targetC = c;
                 targetR = r;
@@ -259,30 +259,40 @@ void enemyUpdate() {
           lastKnownX = px; 
           lastKnownZ = pz;
       } else {
+          // Aumentamos a tolerância para 1.2f. Se ele chegar perto o suficiente, já considera sucesso.
           float distToPatrol = sqrt(pow(patrolDestX - ex, 2) + pow(patrolDestZ - ez, 2));
-          if (distToPatrol < 0.5f) pickPatrolPoint();
+          if (distToPatrol < 1.2f) pickPatrolPoint();
       }
   } else if (aiState == CHASE) {
       if (canSeePlayer) {
           lastKnownX = px;
           lastKnownZ = pz;
       } else {
+          // Aumentamos a tolerância aqui também. Chegou perto de onde o jogador sumiu? Volta a patrulhar.
           float distToLast = sqrt(pow(lastKnownX - ex, 2) + pow(lastKnownZ - ez, 2));
-          if (distToLast < 0.5f) {
+          if (distToLast < 1.2f) {
               aiState = PATROL;
               pickPatrolPoint();
           }
       }
   }
 
+  // Recalcula a rota de tempos em tempos
   if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
     if (aiState == PATROL) recalcPathTo(patrolDestX, patrolDestZ);
     else recalcPathTo(lastKnownX, lastKnownZ);
     lastRecalcTime = now;
+
+    // ---- SISTEMA ANTI-STUCK (DESBLOQUEIO) ----
+    if (!hasTarget) {
+        aiState = PATROL;
+        pickPatrolPoint();
+    }
   }
 
   if (!hasTarget) return;
 
+  // Movimentação Fluida
   float dx = targetX - ex;
   float dz = targetZ - ez;
   float dist = sqrt(dx * dx + dz * dz);
@@ -297,6 +307,9 @@ void enemyUpdate() {
     ex = targetX;
     ez = targetZ;
   }
+
+  // ---- ATUALIZA O ÁUDIO ESPACIAL ----
+  audioUpdateMonsterVolume(px, pz, ex, ez);
 }
 
 void enemyDraw() {
