@@ -105,8 +105,8 @@ void audioUpdate() {
     }
 
     if (isVisible && !wasMonsterVisible) {
-        if (now - lastSpottedTime > 5000) {
-            ma_sound_set_volume(&monsterSound, 1.0f); 
+        if (now - lastSpottedTime > 10000) {
+            ma_sound_set_volume(&monsterSound, 1.0f);
             ma_sound_seek_to_pcm_frame(&monsterSound, 0);
             ma_sound_start(&monsterSound);
             lastSpottedTime = now;

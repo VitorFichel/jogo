@@ -101,7 +101,7 @@ void cameraMouseMotion(int x, int y) {
     return;
   }
 
-  float sensitivity = 0.0002f;
+  float sensitivity = 0.002f;
   float dx = (x - lastMouseX) * sensitivity;
   float dy = (lastMouseY - y) * sensitivity;
 

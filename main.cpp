@@ -139,18 +139,21 @@ int main(int argc, char **argv) {
   glEnable(GL_LIGHT0);
   glEnable(GL_COLOR_MATERIAL);
   glEnable(GL_NORMALIZE);
+glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 35.0f);
+glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 20.0f); // menos concentrada
 
-  glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 30.0f);
-  glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 40.0f);
-  glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
-  glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.1f);
-  glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.05f);
+// Faz a luz perder menos intensidade com a distância
+glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
+glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.03f);
+glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.01f);
 
-  GLfloat lightDiffuse[] = {1.0f, 0.95f, 0.8f, 1.0f};
-  glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+// Luz mais intensa
+GLfloat lightDiffuse[] = {1.5f, 1.4f, 1.2f, 1.0f};
+glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
 
-  GLfloat lowAmbient[] = {0.04f, 0.04f, 0.05f, 1.0f};
-  glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lowAmbient);
+// Aumenta um pouco a iluminação geral da cena
+GLfloat lowAmbient[] = {0.10f, 0.10f, 0.12f, 1.0f};
+glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lowAmbient);
 
   glEnable(GL_FOG);
   GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f};
