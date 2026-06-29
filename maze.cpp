@@ -74,24 +74,50 @@ float spawnKeyX = 5.2f * CELL_SIZE, spawnKeyZ = 1.2f * CELL_SIZE;
 bool hasMainKey = false, mainKeyActive = true;
 float mainKeyX = 8.0f, mainKeyZ = 28.0f; // Agora flutua exatamente sobre a mesa da biblioteca!
 
-// ---- O PROJETO DE INTERIORES (LISTA DE MÓVEIS) ----
-// objFilename, X, Z, Largura, Profundidade, Altura, Rotação Y, Escala, [displayList interna]
+// ---- O PROJETO DE INTERIORES COMPLETO ----
 std::vector<Prop3D> houseProps = {
-    // Sala de Estar
-    {"sofa.obj",           6.0f, 14.0f, 2.5f, 1.0f, 1.0f, 90.0f, 1.0f, 0},
-    {"tv_rack.obj",       11.0f, 14.0f, 0.5f, 2.0f, 0.6f,  0.0f, 1.0f, 0},
-    {"mesa_centro.obj",    8.5f, 14.0f, 1.0f, 0.6f, 0.4f,  0.0f, 1.0f, 0},
-    // Cozinha
-    {"mesa_jantar.obj",   34.0f, 14.0f, 1.5f, 2.5f, 0.9f,  0.0f, 1.0f, 0},
-    {"armario_cozinha.obj",34.0f,10.5f, 2.0f, 0.8f, 2.2f,  0.0f, 1.0f, 0},
-    {"geladeira.obj",     38.0f, 10.5f, 0.8f, 0.8f, 1.8f,  0.0f, 1.0f, 0},
-    // Biblioteca
-    {"estante_livros.obj", 2.5f, 26.0f, 0.8f, 4.0f, 2.5f,  0.0f, 1.0f, 0},
-    {"estante_livros.obj", 6.0f, 22.5f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0},
-    {"mesa_escritorio.obj",8.0f, 28.0f, 1.8f, 0.8f, 0.8f,  0.0f, 1.0f, 0},
-    // Quarto Fundo (Onde nasce o Monstro!)
-    {"cama_casal.obj",    37.0f, 26.0f, 1.6f, 2.2f, 0.6f,  0.0f, 1.0f, 0},
-    {"guarda_roupa.obj",  34.0f, 31.0f, 2.0f, 0.8f, 2.2f,  0.0f, 1.0f, 0}
+    // ---------------------------------------------------------
+    // 1. Quarto Inicial (Topo-Esquerdo) - Onde o jogador nasce
+    // ---------------------------------------------------------
+    {"cama_solteiro.obj",  5.0f,  5.0f, 1.2f, 2.0f, 0.6f, 90.0f, 1.0f, 0},
+    {"comoda.obj",         5.0f,  9.0f, 0.8f, 1.5f, 1.2f,  0.0f, 1.0f, 0},
+    {"criado_mudo.obj",    3.0f,  5.0f, 0.6f, 0.6f, 0.6f,  0.0f, 1.0f, 0}, // Novo apoio ao lado da cama
+    {"cadeira_quarto.obj", 7.0f,  8.0f, 0.6f, 0.6f, 1.0f, 45.0f, 1.0f, 0}, // Cadeira virada para a porta
+
+    // ---------------------------------------------------------
+    // 2. Sala Central e Cozinha (Formato U no Meio)
+    // ---------------------------------------------------------
+    // Área de Jantar e Estar
+    {"mesa_jantar.obj",   21.0f, 31.0f, 2.5f, 1.5f, 0.9f, 90.0f, 1.0f, 0},
+    {"sofa.obj",          21.0f, 25.0f, 2.5f, 1.0f, 1.0f,  0.0f, 1.0f, 0},
+    {"rack_tv.obj",       21.0f, 21.5f, 2.0f, 0.6f, 0.6f,  0.0f, 1.0f, 0}, // Nova TV na frente do sofá
+    // Área da Cozinha (Na parede direita da sala central)
+    {"geladeira.obj",     27.0f, 30.0f, 1.0f, 1.0f, 2.0f, -90.0f, 1.0f, 0},
+    {"fogao.obj",         27.0f, 33.0f, 0.9f, 0.9f, 1.0f, -90.0f, 1.0f, 0},
+    {"armario_cozinha.obj",27.0f, 36.0f, 2.0f, 0.8f, 2.2f,-90.0f, 1.0f, 0},
+
+    // ---------------------------------------------------------
+    // 3. Biblioteca / Escritório (Baixo-Esquerdo)
+    // ---------------------------------------------------------
+    {"estante_livros.obj", 2.0f, 34.0f, 0.8f, 4.0f, 2.5f,  0.0f, 1.0f, 0},
+    {"estante_livros_2.obj",10.0f,38.0f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0}, // Nova estante formando um L
+    {"mesa_escritorio.obj",6.0f, 32.0f, 1.8f, 0.8f, 0.8f,  0.0f, 1.0f, 0},
+    {"cadeira_escritorio.obj",6.0f,30.5f, 0.7f, 0.7f, 1.2f, 180.0f, 1.0f, 0}, // Cadeira do computador
+
+    // ---------------------------------------------------------
+    // 4. Quarto do Fundo (Topo-Direito) - O refúgio
+    // ---------------------------------------------------------
+    {"cama_casal.obj",    37.0f,  7.0f, 1.6f, 2.2f, 0.6f,  0.0f, 1.0f, 0},
+    {"guarda_roupa.obj",  32.0f, 11.0f, 2.0f, 0.8f, 2.2f, 90.0f, 1.0f, 0},
+    {"poltrona.obj",      37.0f, 13.0f, 1.0f, 1.0f, 1.0f,-45.0f, 1.0f, 0}, // Poltrona de leitura no canto
+
+    // ---------------------------------------------------------
+    // 5. Banheiro Sombrio (Baixo-Direito)
+    // ---------------------------------------------------------
+    {"prateleira_velha.obj",35.0f, 38.0f, 2.0f, 0.6f, 2.0f, 90.0f, 1.0f, 0},
+    {"vaso_sanitario.obj",31.0f, 29.0f, 0.6f, 0.8f, 0.8f, 90.0f, 1.0f, 0},
+    {"pia_banheiro.obj",  31.0f, 33.0f, 0.8f, 0.6f, 1.0f, 90.0f, 1.0f, 0},
+    {"banheira.obj",      37.0f, 29.0f, 1.8f, 1.0f, 0.7f,  0.0f, 1.0f, 0}
 };
 // ---------------------------------------------------
 
@@ -108,30 +134,85 @@ GLuint loadTexture(const char* filename) {
     stbi_image_free(data); return tex;
 }
 
-// Carregador genérico de OBJ para os móveis
+#include <map>
+
+static std::map<std::string, GLuint> loadedPropTextures;
+
+// Carregador avançado de OBJ para os móveis (Com suporte a Cores MTL, UVs, Texturas e Correção de Estado)
 GLuint loadPropOBJ(std::string filename) {
-    std::string filepath = "assets/models/" + filename;
+    std::string basepath = "assets/moveis/"; 
+    std::string filepath = basepath + filename;
+    
     tinyobj::ObjReaderConfig reader_config;
+    reader_config.mtl_search_path = basepath; 
+
     tinyobj::ObjReader reader;
 
     if (!reader.ParseFromFile(filepath, reader_config)) {
-        // Se o ficheiro não existir, falha em silêncio. O jogo desenha a caixa substituta.
         return 0;
     }
 
     auto& attrib = reader.GetAttrib();
     auto& shapes = reader.GetShapes();
+    auto& materials = reader.GetMaterials(); 
+
+    // CONFIRMAÇÃO: Mostra no console quantos materiais foram lidos com sucesso do .mtl
+    printf("[Movel] %s carregado com sucesso. Materiais lidos: %d\n", filename.c_str(), (int)materials.size());
+
+    // Pré-carrega todas as imagens de textura exigidas por este modelo para evitar sobrecarga
+    for (const auto& mat : materials) {
+        if (!mat.diffuse_texname.empty() && loadedPropTextures.find(mat.diffuse_texname) == loadedPropTextures.end()) {
+            std::string texPath = basepath + mat.diffuse_texname;
+            GLuint texID = loadTexture(texPath.c_str());
+            if (texID != 0) {
+                loadedPropTextures[mat.diffuse_texname] = texID;
+            } else {
+                printf("Aviso: Nao foi possivel carregar a imagem de textura: %s\n", texPath.c_str());
+            }
+        }
+    }
+
     GLuint list = glGenLists(1);
     glNewList(list, GL_COMPILE);
-
-    // Cor genérica amarronzada caso o modelo não tenha material configurado
-    GLfloat mat_diffuse[] = { 0.4f, 0.3f, 0.2f, 1.0f }; 
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
 
     for (size_t s = 0; s < shapes.size(); s++) {
         size_t index_offset = 0;
         for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
             size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+            
+            int mat_id = shapes[s].mesh.material_ids[f];
+            GLuint currentTex = 0;
+            
+            if (mat_id >= 0 && mat_id < materials.size()) {
+                GLfloat mat_diffuse[] = {
+                    materials[mat_id].diffuse[0],
+                    materials[mat_id].diffuse[1],
+                    materials[mat_id].diffuse[2],
+                    1.0f
+                };
+                // Solução 1: Aplica a cor via iluminação de material
+                glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+                
+                // Solução 2: Força a aplicação direta da cor para neutralizar o conflito com GL_COLOR_MATERIAL
+                glColor3f(materials[mat_id].diffuse[0], materials[mat_id].diffuse[1], materials[mat_id].diffuse[2]);
+                
+                if (!materials[mat_id].diffuse_texname.empty()) {
+                    currentTex = loadedPropTextures[materials[mat_id].diffuse_texname];
+                }
+            } else {
+                GLfloat mat_diffuse[] = { 0.4f, 0.3f, 0.2f, 1.0f }; 
+                glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+                glColor3f(0.4f, 0.3f, 0.2f);
+            }
+
+            // Ativa a textura de imagem caso ela exista para esta face
+            if (currentTex != 0) {
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, currentTex);
+            } else {
+                glDisable(GL_TEXTURE_2D);
+            }
+
             glBegin(GL_POLYGON);
             for (size_t v = 0; v < fv; v++) {
                 tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
@@ -141,12 +222,23 @@ GLuint loadPropOBJ(std::string filename) {
                     tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
                     glNormal3f(nx, ny, nz);
                 }
+                
+                if (idx.texcoord_index >= 0) {
+                    tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                    tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                    glTexCoord2f(tx, 1.0f - ty); 
+                }
+                
                 tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
                 tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                 tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
                 glVertex3f(vx, vy, vz);
             }
             glEnd();
+
+            if (currentTex != 0) {
+                glDisable(GL_TEXTURE_2D);
+            }
             index_offset += fv;
         }
     }
