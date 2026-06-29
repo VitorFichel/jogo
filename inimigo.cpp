@@ -12,63 +12,81 @@
 #include "audio.h"
 
 // ---- CONFIGURAÇÕES DO MODELO 3D ----
-static const float MODEL_SCALE = 0.01f;       
+static const float MODEL_SCALE = 1.0f;       
 static const float MODEL_Y_OFFSET = 0.0f;     
-static const float MODEL_ROTATION_OFFSET = 180.0f; 
-static const float MODEL_ROTATION_X = 90.0f;
+static const float MODEL_ROTATION_OFFSET = 0.0f; 
+static const float MODEL_ROTATION_X = 0.0f;
 
-static GLuint monsterDisplayList = 0;
+// ---- SISTEMA DE ANIMAÇÃO DO INIMIGO (CORES MTL) ----
+const int NUM_FRAMES = 24; // ⚠️ MUDE AQUI PARA O NÚMERO DE FRAMES QUE EXPORTOU!
+static GLuint monsterFrames[NUM_FRAMES];
 
-static void loadMonsterModel() {
-    std::string inputfile = "assets/models/monstro.obj";
-    tinyobj::ObjReaderConfig reader_config;
-    tinyobj::ObjReader reader;
+static void loadMonsterFrames() {
+    for (int i = 0; i < NUM_FRAMES; i++) {
+        char filename[256];
+        // Lê os arquivos gerados pelo Blender: monstro_0001.obj, monstro_0002.obj...
+        sprintf(filename, "assets/models/monstro%04d.obj", i + 1);
 
-    if (!reader.ParseFromFile(inputfile, reader_config)) {
-        if (!reader.Error().empty()) printf("Erro ao carregar monstro.obj: %s\n", reader.Error().c_str());
-        return;
-    }
+        tinyobj::ObjReaderConfig reader_config;
+        reader_config.mtl_search_path = "assets/models/"; 
+        tinyobj::ObjReader reader;
 
-    auto& attrib = reader.GetAttrib();
-    auto& shapes = reader.GetShapes();
-
-    monsterDisplayList = glGenLists(1);
-    glNewList(monsterDisplayList, GL_COMPILE);
-
-    // Material do monstro: Escuro, brilhante e viscoso
-    GLfloat mat_ambient[] = { 0.0f, 0.0f, 0.0f, 1.0f };
-    GLfloat mat_diffuse[] = { 0.15f, 0.15f, 0.15f, 1.0f }; 
-    GLfloat mat_specular[] = { 0.8f, 0.8f, 0.8f, 1.0f };
-    glMaterialfv(GL_FRONT, GL_AMBIENT, mat_ambient);
-    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-    glMaterialfv(GL_FRONT, GL_SPECULAR, mat_specular);
-    glMaterialf(GL_FRONT, GL_SHININESS, 64.0f);
-
-    for (size_t s = 0; s < shapes.size(); s++) {
-        size_t index_offset = 0;
-        for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
-            size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
-            glBegin(GL_POLYGON);
-            for (size_t v = 0; v < fv; v++) {
-                tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
-                
-                if (idx.normal_index >= 0) {
-                    tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
-                    tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
-                    tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
-                    glNormal3f(nx, ny, nz);
-                }
-                
-                tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
-                tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
-                tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
-                glVertex3f(vx, vy, vz);
-            }
-            glEnd();
-            index_offset += fv;
+        if (!reader.ParseFromFile(filename, reader_config)) {
+            printf("Aviso: Nao achou o frame %s\n", filename);
+            monsterFrames[i] = 0;
+            continue;
         }
+
+        auto& attrib = reader.GetAttrib();
+        auto& shapes = reader.GetShapes();
+        auto& materials = reader.GetMaterials(); // Lê as cores do .mtl
+
+        monsterFrames[i] = glGenLists(1);
+        glNewList(monsterFrames[i], GL_COMPILE);
+
+        for (size_t s = 0; s < shapes.size(); s++) {
+            size_t index_offset = 0;
+            for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
+                size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
+                
+                // Aplica a cor definida no material (.mtl)
+                int mat_id = shapes[s].mesh.material_ids[f];
+                if (mat_id >= 0 && mat_id < materials.size()) {
+                    GLfloat mat_diffuse[] = {
+                        materials[mat_id].diffuse[0],
+                        materials[mat_id].diffuse[1],
+                        materials[mat_id].diffuse[2],
+                        1.0f
+                    };
+                    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
+                    glColor3f(materials[mat_id].diffuse[0], materials[mat_id].diffuse[1], materials[mat_id].diffuse[2]);
+                } else {
+                    glColor3f(0.5f, 0.5f, 0.5f); // Cor de segurança
+                }
+
+                glBegin(GL_POLYGON);
+                for (size_t v = 0; v < fv; v++) {
+                    tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
+
+                    if (idx.normal_index >= 0) {
+                        tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
+                        tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
+                        tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
+                        glNormal3f(nx, ny, nz);
+                    }
+                    
+                    tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                    tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                    tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+                    glVertex3f(vx, vy, vz);
+                }
+                glEnd();
+                index_offset += fv;
+            }
+        }
+        glEndList();
     }
-    glEndList();
+    printf("Animacao do monstro carregada com sucesso!\n");
 }
 
 float ex, ez;
@@ -97,7 +115,6 @@ bool checkLineOfSight(float x1, float z1, float x2, float z2) {
     float dz = z2 - z1;
     float dist = sqrt(dx*dx + dz*dz);
     
-    // Visão realista limitada para dar chance de fuga no breu
     if (dist > 12.0f) return false; 
 
     int steps = (int)(dist / 0.2f);
@@ -113,7 +130,6 @@ bool checkLineOfSight(float x1, float z1, float x2, float z2) {
         
         for (const auto& box : worldAABBs) {
             if (!box.active) continue;
-            // Bloqueia apenas em paredes (1) e portas trancadas (5, 6)
             if (box.type == 1 || box.type == 5 || box.type == 6) {
                 if (cx > box.minX && cx < box.maxX && cz > box.minZ && cz < box.maxZ) {
                     return false; 
@@ -152,7 +168,7 @@ void enemyInit() {
     aiState = PATROL;
     hasTarget = false;
     pickPatrolPoint(); 
-    loadMonsterModel(); 
+    loadMonsterFrames(); // <--- CHAMA O CARREGADOR DE ANIMAÇÃO
 }
 
 static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, int &outRow, int &outCol) {
@@ -248,7 +264,6 @@ void enemyUpdate() {
 
     bool canSeePlayer = checkLineOfSight(ex, ez, px, pz);
 
-    // ---- TRANSIÇÃO DE ESTADOS DA IA ----
     if (aiState == PATROL) {
         if (canSeePlayer) {
             aiState = CHASE;
@@ -271,7 +286,6 @@ void enemyUpdate() {
         }
     }
 
-    // Temporizador de processamento do BFS
     if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
         if (aiState == PATROL) recalcPathTo(patrolDestX, patrolDestZ);
         else recalcPathTo(lastKnownX, lastKnownZ);
@@ -285,7 +299,6 @@ void enemyUpdate() {
 
     if (!hasTarget) return;
 
-    // Movimento Dinâmico
     float dx = targetX - ex;
     float dz = targetZ - ez;
     float dist = sqrt(dx * dx + dz * dz);
@@ -301,12 +314,15 @@ void enemyUpdate() {
         ez = targetZ;
     }
 
-    // Chamada do Áudio Espacial Dinâmico
     audioUpdateMonsterVolume(px, pz, ex, ez);
 }
 
 void enemyDraw() {
-    if (monsterDisplayList == 0) return; 
+    // 100 milissegundos por frame = 10 FPS
+    int timeMs = glutGet(GLUT_ELAPSED_TIME);
+    int currentFrame = (timeMs / 100) % NUM_FRAMES; 
+    
+    if (monsterFrames[currentFrame] == 0) return; 
 
     float dx = px - ex;
     float dz = pz - ez;
@@ -319,6 +335,7 @@ void enemyDraw() {
     glScalef(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
 
     glEnable(GL_LIGHTING);
-    glCallList(monsterDisplayList);
+    // Desenha o frame específico da animação!
+    glCallList(monsterFrames[currentFrame]);
     glPopMatrix();
 }

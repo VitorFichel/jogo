@@ -8,6 +8,9 @@
 // Note que o .h do tiny_obj_loader é incluído sem a implementação (pois já está no inimigo.cpp)
 #include "tiny_obj_loader.h"
 
+#define CGLTF_IMPLEMENTATION
+#include "cgltf.h"
+
 
 // A sua nova matriz baseada na planta arquitetônica
 int maze[LAB_H][LAB_W] = {
@@ -79,7 +82,7 @@ std::vector<Prop3D> houseProps = {
     // ---------------------------------------------------------
     // 1. Quarto Inicial (Topo-Esquerdo) - Onde o jogador nasce
     // ---------------------------------------------------------
-    {"cama_solteiro.obj",  5.0f,  5.0f, 1.2f, 2.0f, 0.6f, 90.0f, 1.0f, 0},
+    {"cama.glb",  5.0f,  5.0f, 1.2f, 2.0f, 0.6f, 90.0f, 1.0f, 0},
     {"comoda.obj",         5.0f,  9.0f, 0.8f, 1.5f, 1.2f,  0.0f, 1.0f, 0},
     {"criado_mudo.obj",    3.0f,  5.0f, 0.6f, 0.6f, 0.6f,  0.0f, 1.0f, 0}, // Novo apoio ao lado da cama
     {"cadeira_quarto.obj", 7.0f,  8.0f, 0.6f, 0.6f, 1.0f, 45.0f, 1.0f, 0}, // Cadeira virada para a porta
@@ -89,7 +92,7 @@ std::vector<Prop3D> houseProps = {
     // ---------------------------------------------------------
     // Área de Jantar e Estar
     {"mesa_jantar.obj",   21.0f, 31.0f, 2.5f, 1.5f, 0.9f, 90.0f, 1.0f, 0},
-    {"sofa.obj",          21.0f, 25.0f, 2.5f, 1.0f, 1.0f,  0.0f, 1.0f, 0},
+    {"sofa.glb",          21.0f, 25.0f, 2.5f, 1.0f, 1.0f,  0.0f, 1.0f, 0},
     {"rack_tv.obj",       21.0f, 21.5f, 2.0f, 0.6f, 0.6f,  0.0f, 1.0f, 0}, // Nova TV na frente do sofá
     // Área da Cozinha (Na parede direita da sala central)
     {"geladeira.obj",     27.0f, 30.0f, 1.0f, 1.0f, 2.0f, -90.0f, 1.0f, 0},
@@ -99,7 +102,7 @@ std::vector<Prop3D> houseProps = {
     // ---------------------------------------------------------
     // 3. Biblioteca / Escritório (Baixo-Esquerdo)
     // ---------------------------------------------------------
-    {"estante_livros.obj", 2.0f, 34.0f, 0.8f, 4.0f, 2.5f,  0.0f, 1.0f, 0},
+    {"estante.glb", 2.0f, 34.0f, 0.8f, 4.0f, 2.5f,  0.0f, 1.0f, 0},
     {"estante_livros_2.obj",10.0f,38.0f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0}, // Nova estante formando um L
     {"mesa_escritorio.obj",6.0f, 32.0f, 1.8f, 0.8f, 0.8f,  0.0f, 1.0f, 0},
     {"cadeira_escritorio.obj",6.0f,30.5f, 0.7f, 0.7f, 1.2f, 180.0f, 1.0f, 0}, // Cadeira do computador
@@ -107,7 +110,7 @@ std::vector<Prop3D> houseProps = {
     // ---------------------------------------------------------
     // 4. Quarto do Fundo (Topo-Direito) - O refúgio
     // ---------------------------------------------------------
-    {"cama_casal.obj",    37.0f,  7.0f, 1.6f, 2.2f, 0.6f,  0.0f, 1.0f, 0},
+    {"cama.glb",    37.0f,  7.0f, 1.6f, 2.2f, 0.6f,  0.0f, 1.0f, 0},
     {"guarda_roupa.obj",  32.0f, 11.0f, 2.0f, 0.8f, 2.2f, 90.0f, 1.0f, 0},
     {"poltrona.obj",      37.0f, 13.0f, 1.0f, 1.0f, 1.0f,-45.0f, 1.0f, 0}, // Poltrona de leitura no canto
 
@@ -246,6 +249,108 @@ GLuint loadPropOBJ(std::string filename) {
     return list;
 }
 
+// ---- NOVO CARREGADOR .GLB (Texturas Embutidas e Geometria) ----
+GLuint loadPropGLB(std::string filename) {
+    std::string filepath = "assets/moveis/" + filename;
+    
+    cgltf_options options = {};
+    cgltf_data* data = NULL;
+    cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
+    
+    if (result != cgltf_result_success) {
+        printf("Erro ao ler GLB: %s\n", filepath.c_str());
+        return 0;
+    }
+    
+    // Carrega os buffers binários internos do ficheiro
+    cgltf_load_buffers(&options, data, filepath.c_str());
+
+    GLuint list = glGenLists(1);
+    glNewList(list, GL_COMPILE);
+
+    // Percorre todas as malhas do modelo
+    for (cgltf_size m = 0; m < data->meshes_count; ++m) {
+        cgltf_mesh* mesh = &data->meshes[m];
+        
+        for (cgltf_size p = 0; p < mesh->primitives_count; ++p) {
+            cgltf_primitive* primitive = &mesh->primitives[p];
+            
+            // 1. CARREGAR A TEXTURA EMBUTIDA DA MEMÓRIA
+            GLuint texID = 0;
+            if (primitive->material && primitive->material->has_pbr_metallic_roughness) {
+                cgltf_texture_view* texView = &primitive->material->pbr_metallic_roughness.base_color_texture;
+                if (texView->texture && texView->texture->image) {
+                    cgltf_image* image = texView->texture->image;
+                    if (image->buffer_view) {
+                        // Extrai os bytes da imagem (JPEG/PNG) de dentro do GLB
+                        unsigned char* img_bytes = (unsigned char*)image->buffer_view->buffer->data + image->buffer_view->offset;
+                        int w, h, channels;
+                        // O stb_image descodifica a imagem direto da RAM
+                        unsigned char* pixels = stbi_load_from_memory(img_bytes, image->buffer_view->size, &w, &h, &channels, 4);
+                        if (pixels) {
+                            glGenTextures(1, &texID);
+                            glBindTexture(GL_TEXTURE_2D, texID);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+                            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                            gluBuild2DMipmaps(GL_TEXTURE_2D, GL_RGBA, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+                            stbi_image_free(pixels);
+                        }
+                    }
+                }
+            }
+
+            // Ativa a textura lida
+            if (texID != 0) {
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, texID);
+                glColor3f(1.0f, 1.0f, 1.0f); // Previne contaminação de cor
+            } else {
+                glDisable(GL_TEXTURE_2D);
+                glColor3f(0.5f, 0.5f, 0.5f); // Cor base caso não haja textura
+            }
+
+            // 2. EXTRAIR GEOMETRIA (Posição, Normal, UV)
+            cgltf_accessor* pos_acc = NULL;
+            cgltf_accessor* norm_acc = NULL;
+            cgltf_accessor* uv_acc = NULL;
+            
+            for (cgltf_size a = 0; a < primitive->attributes_count; ++a) {
+                if (primitive->attributes[a].type == cgltf_attribute_type_position) pos_acc = primitive->attributes[a].data;
+                else if (primitive->attributes[a].type == cgltf_attribute_type_normal) norm_acc = primitive->attributes[a].data;
+                else if (primitive->attributes[a].type == cgltf_attribute_type_texcoord) uv_acc = primitive->attributes[a].data;
+            }
+
+            // 3. DESENHAR OS TRIÂNGULOS (Com segurança de tipos via cgltf)
+            if (primitive->indices && pos_acc) {
+                glBegin(GL_TRIANGLES);
+                for (cgltf_size i = 0; i < primitive->indices->count; ++i) {
+                    cgltf_size idx = cgltf_accessor_read_index(primitive->indices, i);
+                    
+                    if (norm_acc) {
+                        float n[3];
+                        cgltf_accessor_read_float(norm_acc, idx, n, 3);
+                        glNormal3f(n[0], n[1], n[2]);
+                    }
+                    if (uv_acc) {
+                        float uv[2];
+                        cgltf_accessor_read_float(uv_acc, idx, uv, 2);
+                        glTexCoord2f(uv[0], 1.0f - uv[1]); // Eixo Y UV invertido para OpenGL Clássico
+                    }
+                    float v[3];
+                    cgltf_accessor_read_float(pos_acc, idx, v, 3);
+                    glVertex3f(v[0], v[1], v[2]);
+                }
+                glEnd();
+            }
+            if (texID != 0) glDisable(GL_TEXTURE_2D);
+        }
+    }
+    
+    glEndList();
+    cgltf_free(data); // Limpa a memória RAM 
+    return list;
+}
+
 void buildAABBs() {
     worldAABBs.clear();
     float WT = 0.15f; 
@@ -301,9 +406,14 @@ void mazeInit() {
     wallTex = loadTexture("assets/textures/wall.jpg");
     floorTex = loadTexture("assets/textures/floor.jpg");
     
-    // Tenta carregar o 3D de cada móvel. Se falhar, fica como 0 e ativa o "plano B"
     for (auto& prop : houseProps) {
-        prop.displayList = loadPropOBJ(prop.objFilename);
+        // Verifica as últimas 4 letras do ficheiro
+        if (prop.objFilename.find(".glb") != std::string::npos) {
+            prop.displayList = loadPropGLB(prop.objFilename);
+            printf("[GLB] Carregado: %s\n", prop.objFilename.c_str());
+        } else {
+            prop.displayList = loadPropOBJ(prop.objFilename);
+        }
     }
     
     buildAABBs(); 
