@@ -20,11 +20,15 @@ static const float MODEL_ROTATION_X = 0.0f;
 // ---- SISTEMA DE ANIMAÇÃO DO INIMIGO (CORES MTL) ----
 const int NUM_FRAMES = 24; // ⚠️ MUDE AQUI PARA O NÚMERO DE FRAMES QUE EXPORTOU!
 static GLuint monsterFrames[NUM_FRAMES];
+static GLuint monsterTexture = 0;
+extern GLuint loadTexture(const char* filename);
 
 static void loadMonsterFrames() {
+    //  COLOQUE AQUI O NOME EXATO DO .PNG QUE VOCÊ EXTRAIU
+    monsterTexture = loadTexture("assets/models/pele_monstro.png"); 
+
     for (int i = 0; i < NUM_FRAMES; i++) {
         char filename[256];
-        // Lê os arquivos gerados pelo Blender: monstro_0001.obj, monstro_0002.obj...
         sprintf(filename, "assets/models/monstro%04d.obj", i + 1);
 
         tinyobj::ObjReaderConfig reader_config;
@@ -39,35 +43,29 @@ static void loadMonsterFrames() {
 
         auto& attrib = reader.GetAttrib();
         auto& shapes = reader.GetShapes();
-        auto& materials = reader.GetMaterials(); // Lê as cores do .mtl
 
         monsterFrames[i] = glGenLists(1);
         glNewList(monsterFrames[i], GL_COMPILE);
+
+        // VESTE A TEXTURA NA ANIMAÇÃO
+        if (monsterTexture != 0) {
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, monsterTexture);
+            glColor3f(1.0f, 1.0f, 1.0f); // Garante a cor original da imagem
+        } else {
+            glColor3f(0.5f, 0.5f, 0.5f); 
+        }
 
         for (size_t s = 0; s < shapes.size(); s++) {
             size_t index_offset = 0;
             for (size_t f = 0; f < shapes[s].mesh.num_face_vertices.size(); f++) {
                 size_t fv = size_t(shapes[s].mesh.num_face_vertices[f]);
                 
-                // Aplica a cor definida no material (.mtl)
-                int mat_id = shapes[s].mesh.material_ids[f];
-                if (mat_id >= 0 && mat_id < materials.size()) {
-                    GLfloat mat_diffuse[] = {
-                        materials[mat_id].diffuse[0],
-                        materials[mat_id].diffuse[1],
-                        materials[mat_id].diffuse[2],
-                        1.0f
-                    };
-                    glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-                    glColor3f(materials[mat_id].diffuse[0], materials[mat_id].diffuse[1], materials[mat_id].diffuse[2]);
-                } else {
-                    glColor3f(0.5f, 0.5f, 0.5f); // Cor de segurança
-                }
-
                 glBegin(GL_POLYGON);
                 for (size_t v = 0; v < fv; v++) {
                     tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 
+                    // Lê o reflexo da luz
                     if (idx.normal_index >= 0) {
                         tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
                         tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
@@ -75,6 +73,14 @@ static void loadMonsterFrames() {
                         glNormal3f(nx, ny, nz);
                     }
                     
+                    // LÊ AS COORDENADAS DA IMAGEM (UV)
+                    if (idx.texcoord_index >= 0) {
+                        tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
+                        tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
+                        glTexCoord2f(tx, 1.0f - ty);
+                    }
+                    
+                    // Lê a posição do modelo
                     tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
                     tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
                     tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
@@ -84,9 +90,13 @@ static void loadMonsterFrames() {
                 index_offset += fv;
             }
         }
+        
+        // DESLIGA A TEXTURA PARA NÃO PINTAR O CHÃO
+        if (monsterTexture != 0) glDisable(GL_TEXTURE_2D);
+        
         glEndList();
     }
-    printf("Animacao do monstro carregada com sucesso!\n");
+    printf("Animacao do monstro carregada com texturas originais!\n");
 }
 
 float ex, ez;
