@@ -87,42 +87,42 @@ std::vector<Prop3D> houseProps = {
     // 1. Quarto Inicial (Topo-Esquerdo) - Onde o jogador nasce
     // ---------------------------------------------------------
     {"cama.glb",  5.0f,  5.0f, 1.2f, 2.0f, 0.6f, 90.0f, 1.0f, 0},
-    {"comoda.obj",         5.0f,  9.0f, 0.8f, 1.5f, 1.2f,  0.0f, 1.0f, 0},
-    {"criado_mudo.obj",    3.0f,  5.0f, 0.6f, 0.6f, 0.6f,  0.0f, 1.0f, 0},
-    {"cadeira_quarto.obj", 7.0f,  8.0f, 0.6f, 0.6f, 1.0f, 45.0f, 1.0f, 0},
+    {"comoda.glb",         5.0f,  9.0f, 0.8f, 1.5f, 1.2f,  0.0f, 1.0f, 0},
+    {"criado_mudo.glb",    3.0f,  5.0f, 0.6f, 0.6f, 0.6f,  0.0f, 1.0f, 0},
+    {"cadeira_quarto.glb", 7.0f,  8.0f, 0.6f, 0.6f, 1.0f, 45.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 2. Sala Central e Cozinha (Formato U no Meio)
     // ---------------------------------------------------------
-    {"mesa_jantar.obj",   21.0f, 31.0f, 2.5f, 1.5f, 0.9f, 90.0f, 1.0f, 0},
+    {"mesa_jantar.glb",   21.0f, 31.0f, 2.5f, 1.5f, 0.9f, 90.0f, 1.0f, 0},
     {"sofa.glb",          21.0f, 25.0f, 2.5f, 1.0f, 1.0f,  0.0f, 1.0f, 0},
-    {"rack_tv.obj",       21.0f, 21.5f, 2.0f, 0.6f, 0.6f,  0.0f, 1.0f, 0},
-    {"geladeira.obj",     27.0f, 30.0f, 1.0f, 1.0f, 2.0f, -90.0f, 1.0f, 0},
-    {"fogao.obj",         27.0f, 33.0f, 0.9f, 0.9f, 1.0f, -90.0f, 1.0f, 0},
-    {"armario_cozinha.obj",27.0f, 36.0f, 2.0f, 0.8f, 2.2f,-90.0f, 1.0f, 0},
+    {"rack_tv.glb",       21.0f, 21.5f, 2.0f, 0.6f, 0.6f,  0.0f, 1.0f, 0},
+    {"geladeira.glb",     27.0f, 30.0f, 1.0f, 1.0f, 2.0f, -90.0f, 1.0f, 0},
+    {"fogao.glb",         27.0f, 33.0f, 0.9f, 0.9f, 1.0f, -90.0f, 1.0f, 0},
+    {"armario_cozinha.glb",27.0f, 36.0f, 2.0f, 0.8f, 2.2f,-90.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 3. Biblioteca / Escritório (Baixo-Esquerdo)
     // ---------------------------------------------------------
     {"estante.glb", 2.0f, 34.0f, 0.8f, 4.0f, 2.5f,  0.0f, 1.0f, 0},
-    {"estante_livros_2.obj",10.0f,38.0f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0},
-    {"mesa_escritorio.obj",6.0f, 32.0f, 1.8f, 0.8f, 0.8f,  0.0f, 1.0f, 0},
-    {"cadeira_escritorio.obj",6.0f,30.5f, 0.7f, 0.7f, 1.2f, 180.0f, 1.0f, 0},
+    {"estante_livros_2.glb",10.0f,38.0f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0},
+    {"mesa_escritorio.glb",6.0f, 32.0f, 1.8f, 0.8f, 0.8f,  0.0f, 1.0f, 0},
+    {"cadeira_escritorio.glb",6.0f,30.5f, 0.7f, 0.7f, 1.2f, 180.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 4. Quarto do Fundo (Topo-Direito) - O refúgio
     // ---------------------------------------------------------
     {"cama.glb",    37.0f,  7.0f, 1.6f, 2.2f, 0.6f,  0.0f, 1.0f, 0},
-    {"guarda_roupa.obj",  32.0f, 11.0f, 2.0f, 0.8f, 2.2f, 90.0f, 1.0f, 0},
-    {"poltrona.obj",      37.0f, 13.0f, 1.0f, 1.0f, 1.0f,-45.0f, 1.0f, 0},
+    {"guarda_roupa.glb",  32.0f, 11.0f, 2.0f, 0.8f, 2.2f, 90.0f, 1.0f, 0},
+    {"poltrona.glb",      37.0f, 13.0f, 1.0f, 1.0f, 1.0f,-45.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 5. Banheiro Sombrio (Baixo-Direito)
     // ---------------------------------------------------------
-    {"prateleira_velha.obj",35.0f, 38.0f, 2.0f, 0.6f, 2.0f, 90.0f, 1.0f, 0},
-    {"vaso_sanitario.obj",31.0f, 29.0f, 0.6f, 0.8f, 0.8f, 90.0f, 1.0f, 0},
-    {"pia_banheiro.obj",  31.0f, 33.0f, 0.8f, 0.6f, 1.0f, 90.0f, 1.0f, 0},
-    {"banheira.obj",      37.0f, 29.0f, 1.8f, 1.0f, 0.7f,  0.0f, 1.0f, 0}
+    {"prateleira_velha.glb",35.0f, 38.0f, 2.0f, 0.6f, 2.0f, 90.0f, 1.0f, 0},
+    {"vaso_sanitario.glb",31.0f, 29.0f, 0.6f, 0.8f, 0.8f, 90.0f, 1.0f, 0},
+    {"pia_banheiro.glb",  31.0f, 33.0f, 0.8f, 0.6f, 1.0f, 90.0f, 1.0f, 0},  
+    {"banheira.glb",      37.0f, 29.0f, 1.8f, 1.0f, 0.7f,  0.0f, 1.0f, 0}
 };
 // ---------------------------------------------------
 
