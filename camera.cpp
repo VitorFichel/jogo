@@ -19,7 +19,7 @@ static float bobOffsetX = 0.0f;
 // -----------------------------------
 
 // ---- VARIÁVEIS DA LANTERNA ----
-float flashlightIntensity = 1.0f;
+float flashlightIntensity = 0.8f;
 static int nextSequenceCheckTime = 0; 
 static int currentStageEndTime = 0;    
 
@@ -168,9 +168,9 @@ void cameraUpdate() {
       nextSequenceCheckTime = now + 200; 
   }
 
-  float baseSpeed = 4.5f;
-  float sprintSpeed = 12.0f; 
-  float exhaustedSpeed = 3.0f; 
+  float baseSpeed = 3.0f;
+  float sprintSpeed = 6.0f; 
+  float exhaustedSpeed = 2.0f; 
   float speed = baseSpeed;
   
   bool isMoving = (keys['w'] || keys['s'] || keys['a'] || keys['d']);

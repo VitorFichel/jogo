@@ -8,7 +8,6 @@
 #include <vector>
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
-#include <iostream>
 #include "audio.h"
 
 // ---- CONFIGURAÇÕES DO MODELO 3D ----
@@ -18,7 +17,7 @@ static const float MODEL_ROTATION_OFFSET = 0.0f;
 static const float MODEL_ROTATION_X = 0.0f;
 
 // ---- SISTEMA DE ANIMAÇÃO DO INIMIGO (CORES MTL) ----
-const int NUM_FRAMES = 24; // ⚠️ MUDE AQUI PARA O NÚMERO DE FRAMES QUE EXPORTOU!
+const int NUM_FRAMES = 22; 
 static GLuint monsterFrames[NUM_FRAMES];
 static GLuint monsterTexture = 0;
 extern GLuint loadTexture(const char* filename);
@@ -317,8 +316,19 @@ void enemyUpdate() {
     float step = currentSpeed * deltaSeconds;
 
     if (dist > step) {
-        ex += (dx / dist) * step;
-        ez += (dz / dist) * step;
+        float moveX = (dx / dist) * step;
+        float moveZ = (dz / dist) * step;
+
+        // Testa X e Z separados (igual ao player) para slide nas paredes
+        float newEx = ex + moveX;
+        float newEz = ez + moveZ;
+
+        const float ENEMY_RADIUS = 0.3f;
+
+        if (!checkCollisionAABB(newEx, ez, ENEMY_RADIUS))
+            ex = newEx;
+        if (!checkCollisionAABB(ex, newEz, ENEMY_RADIUS))
+            ez = newEz;
     } else if (dist > 0.0001f) {
         ex = targetX;
         ez = targetZ;
