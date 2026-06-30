@@ -31,8 +31,10 @@ struct Prop3D {
     float x, z;              // Posição no mundo
     float w, d, h;           // Largura(X), Profundidade(Z), Altura(Y)
     float rotY;              // Rotação para virar o móvel
-    float scale;             // Escala do modelo 3D
+    float scale;             // Escala manual extra (multiplica a autoScale)
     GLuint displayList;      // Guarda o modelo 3D na placa de vídeo
+    float autoScale = 1.0f;    // Calculada automaticamente a partir do bounding box do .glb
+    float baseYOffset = 0.0f;  // Deslocamento em Y pra base do modelo encostar no chão
 };
 
 extern Key keys8[NUM_KEYS];

@@ -246,7 +246,53 @@ GLuint loadPropOBJ(std::string filename) {
 }
 
 // ---- NOVO CARREGADOR .GLB (Texturas Embutidas e Geometria) ----
-GLuint loadPropGLB(std::string filename) {
+// Calcula o bounding box (min/max) de todos os vértices de posição do GLB.
+// Usado para descobrir o tamanho real do modelo antes de desenhá-lo.
+static void computeGLBBounds(cgltf_data* data, float outMin[3], float outMax[3]) {
+    bool any = false;
+    outMin[0] = outMin[1] = outMin[2] =  1e30f;
+    outMax[0] = outMax[1] = outMax[2] = -1e30f;
+
+    for (cgltf_size m = 0; m < data->meshes_count; ++m) {
+        cgltf_mesh* mesh = &data->meshes[m];
+        for (cgltf_size p = 0; p < mesh->primitives_count; ++p) {
+            cgltf_primitive* primitive = &mesh->primitives[p];
+            cgltf_accessor* pos_acc = NULL;
+            for (cgltf_size a = 0; a < primitive->attributes_count; ++a) {
+                if (primitive->attributes[a].type == cgltf_attribute_type_position) {
+                    pos_acc = primitive->attributes[a].data;
+                    break;
+                }
+            }
+            if (!pos_acc) continue;
+            for (cgltf_size i = 0; i < pos_acc->count; ++i) {
+                float v[3];
+                cgltf_accessor_read_float(pos_acc, i, v, 3);
+                for (int k = 0; k < 3; k++) {
+                    if (v[k] < outMin[k]) outMin[k] = v[k];
+                    if (v[k] > outMax[k]) outMax[k] = v[k];
+                }
+                any = true;
+            }
+        }
+    }
+
+    if (!any) {
+        outMin[0] = outMin[1] = outMin[2] = 0.0f;
+        outMax[0] = outMax[1] = outMax[2] = 0.0f;
+    }
+}
+
+// Tamanho-alvo padrão (em unidades do mundo) para o lado mais alto de qualquer
+// móvel .glb carregado. Todo asset que você subir é automaticamente escalado
+// para essa altura, mantendo as proporções originais.
+static const float PROP_TARGET_HEIGHT = 1.4f;
+
+// Carrega um .glb e devolve, além da display list, a escala automática
+// calculada (outAutoScale) e o quanto descer/subir o modelo no eixo Y
+// (outBaseYOffset) para que a base dele fique exatamente em y = 0 (no chão),
+// já considerando essa escala.
+GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOffset) {
     std::string filepath = "assets/moveis/" + filename;
     
     cgltf_options options = {};
@@ -255,10 +301,27 @@ GLuint loadPropGLB(std::string filename) {
     
     if (result != cgltf_result_success) {
         printf("Erro ao ler GLB: %s\n", filepath.c_str());
+        if (outAutoScale) *outAutoScale = 1.0f;
+        if (outBaseYOffset) *outBaseYOffset = 0.0f;
         return 0;
     }
     
     cgltf_load_buffers(&options, data, filepath.c_str());
+
+    // ---- Mede o bounding box real do modelo (em unidades originais do arquivo) ----
+    float bbMin[3], bbMax[3];
+    computeGLBBounds(data, bbMin, bbMax);
+    float sizeX = bbMax[0] - bbMin[0];
+    float sizeY = bbMax[1] - bbMin[1];
+    float sizeZ = bbMax[2] - bbMin[2];
+    float largestSide = sizeY; // normaliza pela altura (eixo Y), que é o mais previsível p/ móveis
+    if (largestSide < 0.0001f) largestSide = std::max(sizeX, sizeZ);
+    if (largestSide < 0.0001f) largestSide = 1.0f; // evita divisão por zero em modelo vazio/degenerado
+
+    float autoScale = PROP_TARGET_HEIGHT / largestSide;
+    if (outAutoScale) *outAutoScale = autoScale;
+    // Desloca para a base do modelo (bbMin.y) ficar em y=0 depois de escalado
+    if (outBaseYOffset) *outBaseYOffset = -bbMin[1] * autoScale;
 
     GLuint list = glGenLists(1);
     glNewList(list, GL_COMPILE);
@@ -393,20 +456,30 @@ void mazeInit() {
     floorTex = loadTexture("assets/textures/floor.jpg");
 
     // Carrega o modelo único usado para todas as 8 chaves (tenta .glb, depois .obj)
-    keyModelList = loadPropGLB("chave.glb");
+    keyModelList = loadPropGLB("chave.glb", nullptr, nullptr);
     if (keyModelList == 0) keyModelList = loadPropOBJ("chave.obj");
     if (keyModelList == 0) printf("Aviso: modelo da chave nao encontrado (assets/moveis/chave.glb ou .obj). Usando cubo como fallback.\n");
 
-    doorModelList = loadPropGLB("porta.glb");
+    doorModelList = loadPropGLB("porta.glb", nullptr, nullptr);
     if (doorModelList == 0) doorModelList = loadPropOBJ("porta.obj");
     if (doorModelList == 0) printf("Aviso: modelo da porta nao encontrado (assets/moveis/porta.glb ou .obj). Usando geometria procedural como fallback.\n");
 
     for (auto& prop : houseProps) {
         if (prop.objFilename.find(".glb") != std::string::npos) {
-            prop.displayList = loadPropGLB(prop.objFilename);
-            printf("[GLB] Carregado: %s\n", prop.objFilename.c_str());
+            float autoScale = 1.0f, baseYOffset = 0.0f;
+            prop.displayList = loadPropGLB(prop.objFilename, &autoScale, &baseYOffset);
+            // Normaliza automaticamente o tamanho do asset: a escala final do móvel
+            // passa a ser a escala manual (prop.scale, definida em houseProps) MULTIPLICADA
+            // pela escala automática calculada a partir do tamanho real do .glb.
+            // Assim, qualquer .glb novo que você jogar em assets/moveis/ já nasce
+            // num tamanho padronizado, mesmo que o modelo venha gigante ou minúsculo.
+            prop.autoScale = autoScale;
+            prop.baseYOffset = baseYOffset;
+            printf("[GLB] Carregado: %s (autoScale=%.3f)\n", prop.objFilename.c_str(), autoScale);
         } else {
             prop.displayList = loadPropOBJ(prop.objFilename);
+            prop.autoScale = 1.0f;
+            prop.baseYOffset = 0.0f;
         }
     }
     
@@ -512,10 +585,13 @@ void mazeDraw() {
     // 3. DESENHO DOS MÓVEIS
     for (const auto& prop : houseProps) {
         if (prop.displayList != 0) {
+            float finalScale = prop.scale * prop.autoScale;
             glPushMatrix();
-            glTranslatef(prop.x, 0.0f, prop.z);
+            // baseYOffset já está em unidades pós-autoScale; multiplicamos
+            // pela escala manual (prop.scale) pra acompanhar o tamanho final.
+            glTranslatef(prop.x, prop.baseYOffset * prop.scale, prop.z);
             glRotatef(prop.rotY, 0, 1, 0);
-            glScalef(prop.scale, prop.scale, prop.scale);
+            glScalef(finalScale, finalScale, finalScale);
             glEnable(GL_LIGHTING);
             glCallList(prop.displayList);
             glPopMatrix();
