@@ -228,11 +228,48 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, in
     return true;
 }
 
+// Garante que (row, col) caia numa célula livre, procurando a célula
+// transitável mais próxima caso o ponto informado esteja em cima de
+// uma parede (ex.: jogador encostado/"dentro" da espessura da parede).
+static bool findNearestFreeCell(int row, int col, int &outRow, int &outCol) {
+    if (row < 0 || row >= LAB_H || col < 0 || col >= LAB_W) return false;
+
+    if (maze[row][col] == 0) {
+        outRow = row;
+        outCol = col;
+        return true;
+    }
+
+    for (int radius = 1; radius < LAB_W + LAB_H; radius++) {
+        for (int dr = -radius; dr <= radius; dr++) {
+            for (int dc = -radius; dc <= radius; dc++) {
+                if (abs(dr) != radius && abs(dc) != radius) continue;
+
+                int nr = row + dr;
+                int nc = col + dc;
+                if (nr < 0 || nr >= LAB_H || nc < 0 || nc >= LAB_W) continue;
+                if (maze[nr][nc] == 0) {
+                    outRow = nr;
+                    outCol = nc;
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 static void recalcPathTo(float destX, float destZ) {
     int enemyCol = (int)(ex / CELL_SIZE);
     int enemyRow = (int)(ez / CELL_SIZE);
-    int goalCol = (int)(destX / CELL_SIZE);
-    int goalRow = (int)(destZ / CELL_SIZE);
+    int rawGoalCol = (int)(destX / CELL_SIZE);
+    int rawGoalRow = (int)(destZ / CELL_SIZE);
+
+    int goalRow, goalCol;
+    if (!findNearestFreeCell(rawGoalRow, rawGoalCol, goalRow, goalCol)) {
+        hasTarget = false;
+        return;
+    }
 
     if (enemyRow == goalRow && enemyCol == goalCol) {
         targetX = destX;
@@ -303,6 +340,10 @@ void enemyUpdate() {
         if (!hasTarget) {
             aiState = PATROL;
             pickPatrolPoint();
+            // Recalcula na hora, sem esperar o próximo ciclo de 300ms,
+            // para o inimigo não ficar "congelado" por causa de um
+            // destino inválido (ex.: jogador encostado numa parede).
+            recalcPathTo(patrolDestX, patrolDestZ);
         }
     }
 
