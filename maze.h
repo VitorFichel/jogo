@@ -38,6 +38,8 @@ struct Prop3D {
 extern Key keys8[NUM_KEYS];
 extern int keysCollected;
 extern std::vector<Prop3D> houseProps;
+extern GLuint keyModelList; // display list do modelo 3D único da chave (chave.glb/.obj)
+extern GLuint doorModelList; // display list do modelo 3D da porta de saída (porta.glb/.obj)
 // ----------------------------------------
 
 extern std::vector<AABB> worldAABBs;

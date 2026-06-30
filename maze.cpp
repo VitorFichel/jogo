@@ -58,6 +58,8 @@ Key keys8[NUM_KEYS] = {
 };
 
 int keysCollected = 0;
+GLuint keyModelList = 0;
+GLuint doorModelList = 0;
 
 // Ordem embaralhada em que as chaves vão aparecer
 int keyOrder[NUM_KEYS];
@@ -375,7 +377,8 @@ void buildAABBs() {
                     worldAABBs.push_back({cx - WT/2.0f, cz - gap/2.0f, cx + WT/2.0f, cz + gap/2.0f, doorType, true});
                 }
             } else if (type == 2) {
-                worldAABBs.push_back({cx - 0.5f, cz - 0.5f, cx + 0.5f, cz + 0.5f, 2, true});
+                float gap = 1.0f;
+                worldAABBs.push_back({cx - gap/2.0f, cz - gap/2.0f, cx + gap/2.0f, cz + gap/2.0f, 2, true});
             }
         }
     }
@@ -388,7 +391,16 @@ void buildAABBs() {
 void mazeInit() {
     wallTex = loadTexture("assets/textures/wall.jpg");
     floorTex = loadTexture("assets/textures/floor.jpg");
-    
+
+    // Carrega o modelo único usado para todas as 8 chaves (tenta .glb, depois .obj)
+    keyModelList = loadPropGLB("chave.glb");
+    if (keyModelList == 0) keyModelList = loadPropOBJ("chave.obj");
+    if (keyModelList == 0) printf("Aviso: modelo da chave nao encontrado (assets/moveis/chave.glb ou .obj). Usando cubo como fallback.\n");
+
+    doorModelList = loadPropGLB("porta.glb");
+    if (doorModelList == 0) doorModelList = loadPropOBJ("porta.obj");
+    if (doorModelList == 0) printf("Aviso: modelo da porta nao encontrado (assets/moveis/porta.glb ou .obj). Usando geometria procedural como fallback.\n");
+
     for (auto& prop : houseProps) {
         if (prop.objFilename.find(".glb") != std::string::npos) {
             prop.displayList = loadPropGLB(prop.objFilename);
@@ -462,12 +474,34 @@ void mazeDraw() {
         if (!box.active) continue; 
         if (box.type == 1) { glColor3f(1.0f, 1.0f, 1.0f); drawAABB(box, WALL_HEIGHT); }
         else if (box.type == 2) {
-            // Saída: verde se tiver todas as chaves, vermelha se não
-            if (keysCollected >= NUM_KEYS)
+            // Saída: porta sempre visível. Vermelha/trancada sem todas as chaves,
+            // verde/destrancada quando completar.
+            bool unlocked = (keysCollected >= NUM_KEYS);
+            if (unlocked)
                 glColor3f(0.0f, 0.8f, 0.2f);
             else
                 glColor3f(0.8f, 0.1f, 0.1f);
-            drawAABB(box, WALL_HEIGHT);
+
+            if (doorModelList != 0) {
+                float cx = (box.minX + box.maxX) / 2.0f;
+                float cz = (box.minZ + box.maxZ) / 2.0f;
+                float doorW = box.maxX - box.minX;
+                float doorD = box.maxZ - box.minZ;
+                bool horizontal = doorW >= doorD; // porta "deitada" no eixo X ou no Z
+
+                glDisable(GL_TEXTURE_2D);
+                glPushMatrix();
+                glTranslatef(cx, 0.0f, cz);
+                glRotatef(horizontal ? 0.0f : 90.0f, 0, 1, 0);
+                glScalef(1.0f, 1.0f, 1.0f); // ajuste a escala conforme o tamanho real do asset
+                glCallList(doorModelList);
+                glPopMatrix();
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, wallTex);
+                glColor3f(1.0f, 1.0f, 1.0f);
+            } else {
+                drawDoorHeader(box, 2.0f, WALL_HEIGHT);
+            }
         }
         else if (box.type == 3) { glColor3f(1.0f, 1.0f, 1.0f); drawDoorHeader(box, 2.0f, WALL_HEIGHT); }
         else if (box.type == 5) { glColor3f(0.5f, 0.5f, 0.6f); drawAABB(box, 2.0f); }
@@ -505,13 +539,22 @@ void mazeDraw() {
         glPushMatrix();
         glTranslatef(keys8[i].x, bob, keys8[i].z);
         glRotatef(rot, 0, 1, 0);
-        glScalef(0.14f, 0.14f, 0.14f);
-        // Alterna a cor entre prata e dourado pra distinguir
-        if (i % 2 == 0)
-            glColor3f(0.9f, 0.8f, 0.1f); // dourado
-        else
-            glColor3f(0.7f, 0.7f, 0.85f); // prata
-        glutSolidCube(1.0f);
+
+        if (keyModelList != 0) {
+            glScalef(0.001f, 0.001f, 0.001f);
+            glEnable(GL_LIGHTING);
+            glColor3f(1.0f, 1.0f, 1.0f);
+            glCallList(keyModelList);
+        } else {
+            glDisable(GL_TEXTURE_2D);
+            glScalef(0.14f, 0.14f, 0.14f);
+            // Alterna a cor entre prata e dourado pra distinguir
+            if (i % 2 == 0)
+                glColor3f(0.9f, 0.8f, 0.1f); // dourado
+            else
+                glColor3f(0.7f, 0.7f, 0.85f); // prata
+            glutSolidCube(1.0f);
+        }
         glPopMatrix();
     }
 }
@@ -520,7 +563,8 @@ bool checkCollisionAABB(float px, float pz, float radius) {
     float pMinX = px - radius, pMaxX = px + radius; float pMinZ = pz - radius, pMaxZ = pz + radius;
     for (const auto& box : worldAABBs) {
         if (!box.active) continue; 
-        if (box.type == 1 || box.type == 4 || box.type == 5 || box.type == 6) { 
+        bool isLockedExit = (box.type == 2 && keysCollected < NUM_KEYS);
+        if (box.type == 1 || box.type == 4 || box.type == 5 || box.type == 6 || isLockedExit) { 
             if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) return true;
         }
     }
