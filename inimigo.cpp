@@ -116,6 +116,9 @@ static int lastUpdateTime = 0;
 
 static float targetX, targetZ;
 static bool hasTarget = false;
+
+// Direção que o inimigo está "olhando" (baseada no movimento, não no player)
+static float facingDirX = 0.0f, facingDirZ = 1.0f;
 // ----------------------------------
 
 // ---- SISTEMA DE VISÃO (RAYCASTING) ----
@@ -366,10 +369,19 @@ void enemyUpdate() {
 
         const float ENEMY_RADIUS = 0.3f;
 
-        if (!checkCollisionAABB(newEx, ez, ENEMY_RADIUS))
-            ex = newEx;
-        if (!checkCollisionAABB(ex, newEz, ENEMY_RADIUS))
-            ez = newEz;
+        bool movedX = false, movedZ = false;
+        if (!checkCollisionAABB(newEx, ez, ENEMY_RADIUS)) { ex = newEx; movedX = true; }
+        if (!checkCollisionAABB(ex, newEz, ENEMY_RADIUS)) { ez = newEz; movedZ = true; }
+
+        // Atualiza a direção visual com o deslocamento que de fato aconteceu
+        // (evita "olhar" pra dentro de uma parede quando só um eixo deslizou)
+        float facedX = movedX ? moveX : 0.0f;
+        float facedZ = movedZ ? moveZ : 0.0f;
+        float facedLen = sqrt(facedX * facedX + facedZ * facedZ);
+        if (facedLen > 0.0001f) {
+            facingDirX = facedX / facedLen;
+            facingDirZ = facedZ / facedLen;
+        }
     } else if (dist > 0.0001f) {
         ex = targetX;
         ez = targetZ;
@@ -385,9 +397,7 @@ void enemyDraw() {
     
     if (monsterFrames[currentFrame] == 0) return; 
 
-    float dx = px - ex;
-    float dz = pz - ez;
-    float angle = atan2(dx, dz) * 180.0f / PI;
+    float angle = atan2(facingDirX, facingDirZ) * 180.0f / PI;
 
     glPushMatrix();
     glTranslatef(ex, MODEL_Y_OFFSET, ez);
