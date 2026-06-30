@@ -2,6 +2,7 @@
 #define INIMIGO_H
 
 extern float ex, ez; // posição do inimigo em coordenadas de mundo
+extern bool isChasing;
 
 void enemyInit();
 void enemyUpdate(); // chamar todo frame; decide internamente quando recalcular

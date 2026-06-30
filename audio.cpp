@@ -16,8 +16,8 @@ ma_sound ambientSound;
 ma_sound breathSound; 
 ma_sound heartSound;  
 ma_sound jumpscareSound;
+ma_sound chaseSound;
 
-// Risadas e latin
 static ma_sound laughs[4];
 static ma_sound latinSound;
 static int activeLaugh = -1; // qual risada está tocando (-1 = nenhuma)
@@ -55,6 +55,9 @@ void audioInit() {
     ma_sound_init_from_file(&engine, "assets/audio/riso3.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &laughs[2]);
     ma_sound_init_from_file(&engine, "assets/audio/riso4.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &laughs[3]);
     ma_sound_init_from_file(&engine, "assets/audio/latin.mp3",  MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &latinSound);
+    ma_sound_init_from_file(&engine, "assets/audio/perseguicao.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &chaseSound);
+ma_sound_set_looping(&chaseSound, MA_TRUE);
+ma_sound_set_volume(&chaseSound, 0.8f); 
 
     // Todos os sons de susto/risada não fazem loop
     for (int i = 0; i < 4; i++)
@@ -84,6 +87,7 @@ void audioUpdate() {
         ma_sound_stop(&ambientSound);
         ma_sound_stop(&breathSound);
         ma_sound_stop(&heartSound);
+        ma_sound_stop(&chaseSound);
         // Para qualquer risada que esteja tocando
         for (int i = 0; i < 4; i++) ma_sound_stop(&laughs[i]);
         ma_sound_stop(&latinSound);
@@ -152,6 +156,25 @@ void audioUpdate() {
     }
     // -----------------------------------------------------------------------
 
+      // ---- SOM DE PERSEGUIÇÃO ----
+  static bool wasChasing = false;
+  if (isChasing) {
+      if (!wasChasing) {
+          ma_sound_seek_to_pcm_frame(&chaseSound, 0);
+          ma_sound_start(&chaseSound);
+          ma_sound_seek_to_pcm_frame(&heartSound,  0);
+          ma_sound_start(&heartSound);
+          wasChasing = true;
+      }
+  } else {
+      if (wasChasing) {
+          ma_sound_stop(&chaseSound);
+          ma_sound_stop(&heartSound);
+          wasChasing = false;
+      }
+  }
+  // -----------------------------
+
     // ---- EXAUSTÃO (Stamina) ----
     static bool wasExhausted = false;
     if (isExhausted) {
@@ -186,5 +209,6 @@ void audioCleanup() {
     ma_sound_uninit(&jumpscareSound);
     for (int i = 0; i < 4; i++) ma_sound_uninit(&laughs[i]);
     ma_sound_uninit(&latinSound);
+    ma_sound_uninit(&chaseSound);
     ma_engine_uninit(&engine);
 }

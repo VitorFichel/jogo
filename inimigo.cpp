@@ -99,8 +99,8 @@ static void loadMonsterFrames() {
 }
 
 float ex, ez;
+bool isChasing = false; 
 
-// ---- MÁQUINA DE ESTADOS DA IA ----
 enum AIState { PATROL, CHASE };
 AIState aiState = PATROL;
 
@@ -308,6 +308,7 @@ void enemyUpdate() {
         pitch = 0.2f; 
         ex = px + cos(yaw) * 0.3f;
         ez = pz + sin(yaw) * 0.3f;
+        isChasing = false;
         return; 
     }
 
@@ -334,6 +335,8 @@ void enemyUpdate() {
             }
         }
     }
+
+    isChasing = (aiState == CHASE);
 
     if (now - lastRecalcTime >= RECALC_INTERVAL_MS) {
         if (aiState == PATROL) recalcPathTo(patrolDestX, patrolDestZ);
