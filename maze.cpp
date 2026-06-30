@@ -81,13 +81,6 @@ static void shuffleAndStart() {
     keys8[keyOrder[0]].active = true;
 }
 
-// ---- LISTA DE MÓVEIS DA CASA ----
-// Vazia por enquanto - adicione aqui os Props reais (.obj/.glb) quando tiver os modelos.
-// Formato: {"arquivo.glb", x, z, largura, profundidade, altura, rotY, escala, displayList}
-std::vector<Prop3D> houseProps = {
-};
-// ---------------------------------------------------
-
 GLuint loadTexture(const char* filename) {
     int width, height, channels;
     unsigned char* data = stbi_load(filename, &width, &height, &channels, 4);
@@ -261,13 +254,6 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
     cgltf_data* data = NULL;
     cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
     
-    if (result != cgltf_result_success) {
-        printf("Erro ao ler GLB: %s\n", filepath.c_str());
-        if (outAutoScale) *outAutoScale = 1.0f;
-        if (outBaseYOffset) *outBaseYOffset = 0.0f;
-        return 0;
-    }
-    
     cgltf_load_buffers(&options, data, filepath.c_str());
 
     // ---- Mede o bounding box real do modelo (em unidades originais do arquivo) ----
@@ -417,21 +403,18 @@ void buildAABBs() {
                 else if (onTopBorder || onBottomBorder) horizontal = true;
 
                 float gap = 1.0f;
+                float overlap = 0.02f; // evita frestas por imprecisão de ponto flutuante entre o painel e as paredes vizinhas
                 if (horizontal) {
-                    worldAABBs.push_back({cx - CELL_SIZE/2.0f, cz - WT, cx - gap/2.0f, cz + WT, 1, true});
-                    worldAABBs.push_back({cx + gap/2.0f, cz - WT, cx + CELL_SIZE/2.0f, cz + WT, 1, true});
-                    worldAABBs.push_back({cx - gap/2.0f, cz - WT, cx + gap/2.0f, cz + WT, 2, true});
+                    worldAABBs.push_back({cx - CELL_SIZE/2.0f, cz - WT, cx - gap/2.0f + overlap, cz + WT, 1, true});
+                    worldAABBs.push_back({cx + gap/2.0f - overlap, cz - WT, cx + CELL_SIZE/2.0f, cz + WT, 1, true});
+                    worldAABBs.push_back({cx - gap/2.0f - overlap, cz - WT, cx + gap/2.0f + overlap, cz + WT, 2, true});
                 } else {
-                    worldAABBs.push_back({cx - WT, cz - CELL_SIZE/2.0f, cx + WT, cz - gap/2.0f, 1, true});
-                    worldAABBs.push_back({cx - WT, cz + gap/2.0f, cx + WT, cz + CELL_SIZE/2.0f, 1, true});
-                    worldAABBs.push_back({cx - WT, cz - gap/2.0f, cx + WT, cz + gap/2.0f, 2, true});
+                    worldAABBs.push_back({cx - WT, cz - CELL_SIZE/2.0f, cx + WT, cz - gap/2.0f + overlap, 1, true});
+                    worldAABBs.push_back({cx - WT, cz + gap/2.0f - overlap, cx + WT, cz + CELL_SIZE/2.0f, 1, true});
+                    worldAABBs.push_back({cx - WT, cz - gap/2.0f - overlap, cx + WT, cz + gap/2.0f + overlap, 2, true});
                 }
             }
         }
-    }
-
-    for (const auto& prop : houseProps) {
-        worldAABBs.push_back({prop.x - prop.w/2.0f, prop.z - prop.d/2.0f, prop.x + prop.w/2.0f, prop.z + prop.d/2.0f, 4, true});
     }
 }
 
@@ -463,25 +446,6 @@ void mazeInit() {
         doorModelBaseYOffset *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
     }
 
-    for (auto& prop : houseProps) {
-        if (prop.objFilename.find(".glb") != std::string::npos) {
-            float autoScale = 1.0f, baseYOffset = 0.0f;
-            prop.displayList = loadPropGLB(prop.objFilename, &autoScale, &baseYOffset);
-            // Normaliza automaticamente o tamanho do asset: a escala final do móvel
-            // passa a ser a escala manual (prop.scale, definida em houseProps) MULTIPLICADA
-            // pela escala automática calculada a partir do tamanho real do .glb.
-            // Assim, qualquer .glb novo que você jogar em assets/moveis/ já nasce
-            // num tamanho padronizado, mesmo que o modelo venha gigante ou minúsculo.
-            prop.autoScale = autoScale;
-            prop.baseYOffset = baseYOffset;
-            printf("[GLB] Carregado: %s (autoScale=%.3f)\n", prop.objFilename.c_str(), autoScale);
-        } else {
-            prop.displayList = loadPropOBJ(prop.objFilename);
-            prop.autoScale = 1.0f;
-            prop.baseYOffset = 0.0f;
-        }
-    }
-    
     buildAABBs();
 
     // Reseta e embaralha a ordem das chaves
@@ -589,30 +553,6 @@ void mazeDraw() {
     }
     glDisable(GL_TEXTURE_2D);
 
-    // 3. DESENHO DOS MÓVEIS
-    for (const auto& prop : houseProps) {
-        if (prop.displayList != 0) {
-            float finalScale = prop.scale * prop.autoScale;
-            glPushMatrix();
-            // baseYOffset já está em unidades pós-autoScale; multiplicamos
-            // pela escala manual (prop.scale) pra acompanhar o tamanho final.
-            glTranslatef(prop.x, prop.baseYOffset * prop.scale, prop.z);
-            glRotatef(prop.rotY, 0, 1, 0);
-            glScalef(finalScale, finalScale, finalScale);
-            glEnable(GL_LIGHTING);
-            glCallList(prop.displayList);
-            glPopMatrix();
-        } else {
-            glDisable(GL_TEXTURE_2D);
-            glColor3f(0.4f, 0.2f, 0.1f);
-            glPushMatrix();
-            glTranslatef(prop.x, prop.h / 2.0f, prop.z);
-            glScalef(prop.w, prop.h, prop.d);
-            glutSolidCube(1.0f);
-            glPopMatrix();
-        }
-    }
-
     // ---- DESENHA AS 8 CHAVES ----
     int now = glutGet(GLUT_ELAPSED_TIME);
     for (int i = 0; i < NUM_KEYS; i++) {
@@ -647,7 +587,7 @@ bool checkCollisionAABB(float px, float pz, float radius) {
     for (const auto& box : worldAABBs) {
         if (!box.active) continue; 
         bool isLockedExit = (box.type == 2 && keysCollected < NUM_KEYS);
-        if (box.type == 1 || box.type == 4 || box.type == 5 || box.type == 6 || isLockedExit) { 
+        if (box.type == 1 || box.type == 5 || box.type == 6 || isLockedExit) { 
             if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) return true;
         }
     }
@@ -707,10 +647,9 @@ void updateInteractables(float px, float pz, float radius) {
                 keys8[idx].active = false;
                 keysCollected++;
                 currentKeyIndex++;
-                // Inicia o delay de 10s antes de mostrar a próxima
+                // Ativa a próxima chave imediatamente, sem delay.
                 if (currentKeyIndex < NUM_KEYS) {
-                    waitingDelay = true;
-                    nextKeyTime  = now + 10000;
+                    keys8[keyOrder[currentKeyIndex]].active = true;
                 }
             }
         }

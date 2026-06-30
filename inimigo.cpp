@@ -19,7 +19,7 @@ static const float MODEL_ROTATION_X = 0.0f;
 // Altura aproximada (eixo Y) do rosto do monstro, em unidades de mundo,
 // usada pra travar a câmera nele durante o jumpscare. Se o modelo do
 // monstro for maior/menor que um humano padrão, ajuste esse valor.
-static const float MONSTER_FACE_HEIGHT = 1.6f;
+static const float MONSTER_FACE_HEIGHT = 8.8f;
 
 // ---- SISTEMA DE ANIMAÇÃO DO INIMIGO (CORES MTL) ----
 const int NUM_FRAMES = 22; 
