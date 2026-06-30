@@ -5,6 +5,11 @@
 #include "maze.h"
 #include <GL/freeglut_std.h>
 #include <GL/glut.h>
+#include <cstdio>
+
+// Declarações externas do sistema de chaves (maze.cpp)
+extern bool waitingDelay;
+extern int  nextKeyTime;
 
 void display() {
   if (state == PLAYING) {
@@ -12,31 +17,26 @@ void display() {
     enemyUpdate();
   }
 
-  // ---- CONTROLE DE TEMPO DO JUMPSCARE ----
-  // Espera 1500 milissegundos (1.5s) de susto antes de dar a tela de morte real
   if (state == JUMPSCARE) {
     if (glutGet(GLUT_ELAPSED_TIME) - jumpscareStartTime > 1500) {
       state = LOST;
     }
   }
 
-  // O áudio agora atualiza fora dos ifs para continuar tocando durante a morte
   audioUpdate();
 
-  // 1. Desenha o mundo 3D
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   cameraApply();
   cameraApplyLight();
 
-  // Só desenha o labirinto e o monstro se estiver vivo ou tomando o susto
   if (state == PLAYING || state == JUMPSCARE) {
     mazeDraw();
     enemyDraw();
   }
 
-  // 2. Entra no modo 2D para desenhar a Interface (HUD e Telas Finais)
+  // ---- Modo 2D para HUD e telas ----
   glMatrixMode(GL_PROJECTION);
   glPushMatrix();
   glLoadIdentity();
@@ -48,16 +48,14 @@ void display() {
   glDisable(GL_DEPTH_TEST);
 
   if (state == PLAYING) {
-    // ---- HUD DA ESTAMINA ----
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    // ---- BARRA DE ESTAMINA ----
     glColor4f(0.15f, 0.15f, 0.15f, 0.6f);
     glBegin(GL_QUADS);
-    glVertex2f(300, 20);
-    glVertex2f(500, 20);
-    glVertex2f(500, 24);
-    glVertex2f(300, 24);
+    glVertex2f(300, 20); glVertex2f(500, 20);
+    glVertex2f(500, 24); glVertex2f(300, 24);
     glEnd();
 
     if (isExhausted)
@@ -66,17 +64,71 @@ void display() {
       glColor4f(0.6f, 0.6f, 0.6f, 0.6f);
 
     glBegin(GL_QUADS);
-    glVertex2f(300, 20);
-    glVertex2f(300 + (stamina * 2.0f), 20);
-    glVertex2f(300 + (stamina * 2.0f), 24);
-    glVertex2f(300, 24);
+    glVertex2f(300, 20); glVertex2f(300 + (stamina * 2.0f), 20);
+    glVertex2f(300 + (stamina * 2.0f), 24); glVertex2f(300, 24);
     glEnd();
 
+    // ---- HUD DAS CHAVES ----
+    // Fundo semitransparente
+    glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
+    glBegin(GL_QUADS);
+    glVertex2f(10, 570); glVertex2f(160, 570);
+    glVertex2f(160, 590); glVertex2f(10, 590);
+    glEnd();
+
+    // Texto "Chaves: X/8"
+    if (keysCollected >= NUM_KEYS)
+      glColor4f(0.0f, 1.0f, 0.3f, 1.0f); // verde quando completo
+    else
+      glColor4f(1.0f, 0.85f, 0.1f, 1.0f); // dourado
+
+    glRasterPos2i(15, 575);
+    char keyMsg[32];
+    snprintf(keyMsg, sizeof(keyMsg), "Chaves: %d / %d", keysCollected, NUM_KEYS);
+    for (const char* c = keyMsg; *c; c++)
+      glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
+
+    // Ícones das chaves (quadradinhos dourados/cinzas)
+    for (int i = 0; i < NUM_KEYS; i++) {
+      float kx = 15.0f + i * 18.0f;
+      float ky = 555.0f;
+      if (i < keysCollected)
+        glColor4f(1.0f, 0.8f, 0.0f, 1.0f); // coletada: dourado
+      else
+        glColor4f(0.3f, 0.3f, 0.3f, 0.7f); // pendente: cinza
+
+      glBegin(GL_QUADS);
+      glVertex2f(kx,      ky);
+      glVertex2f(kx + 12, ky);
+      glVertex2f(kx + 12, ky + 12);
+      glVertex2f(kx,      ky + 12);
+      glEnd();
+    }
+
+    // Aviso quando tem todas as chaves
+    if (keysCollected >= NUM_KEYS) {
+      glColor4f(0.0f, 1.0f, 0.3f, 0.9f);
+      glRasterPos2i(270, 50);
+      const char* unlockMsg = "Saida desbloqueada!";
+      for (const char* c = unlockMsg; *c; c++)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    // Countdown do delay entre chaves
+    if (waitingDelay) {
+      int remaining = (nextKeyTime - glutGet(GLUT_ELAPSED_TIME)) / 1000 + 1;
+      if (remaining < 0) remaining = 0;
+      glColor4f(0.8f, 0.8f, 0.2f, 0.9f);
+      glRasterPos2i(290, 50);
+      char countMsg[48];
+      snprintf(countMsg, sizeof(countMsg), "Proxima chave em %ds...", remaining);
+      for (const char* c = countMsg; *c; c++)
+        glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
     glDisable(GL_BLEND);
+
   } else if (state == WON || state == LOST) {
-    // ---- TELA DE VITÓRIA OU DERROTA ----
-    // Nota: A tela de GameOver NÃO desenha durante o estado JUMPSCARE,
-    // deixando a tela limpa para focar só no monstro e no grito.
     glColor3f(1, 0, 0);
     if (state == WON)
       glColor3f(0.0f, 1.0f, 0.2f);
@@ -88,7 +140,6 @@ void display() {
       glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
   }
 
-  // 3. Restaura as configurações do 3D para o próximo frame
   glEnable(GL_LIGHTING);
   glEnable(GL_DEPTH_TEST);
   glPopMatrix();
@@ -108,7 +159,6 @@ void keyboard(unsigned char key, int x, int y) {
       keys[i] = false;
     return;
   }
-  // Bloqueia a movimentação durante o jumpscare
   if (state == PLAYING)
     cameraKeyDown(key);
 }
@@ -139,21 +189,15 @@ int main(int argc, char **argv) {
   glEnable(GL_LIGHT0);
   glEnable(GL_COLOR_MATERIAL);
   glEnable(GL_NORMALIZE);
-glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 35.0f);
-glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 20.0f); // menos concentrada
-
-// Faz a luz perder menos intensidade com a distância
-glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
-glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.03f);
-glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.01f);
-
-// Luz mais intensa
-GLfloat lightDiffuse[] = {1.5f, 1.4f, 1.2f, 1.0f};
-glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
-
-// Aumenta um pouco a iluminação geral da cena
-GLfloat lowAmbient[] = {0.10f, 0.10f, 0.12f, 1.0f};
-glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lowAmbient);
+  glLightf(GL_LIGHT0, GL_SPOT_CUTOFF, 35.0f);
+  glLightf(GL_LIGHT0, GL_SPOT_EXPONENT, 20.0f);
+  glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, 1.0f);
+  glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, 0.03f);
+  glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, 0.01f);
+  GLfloat lightDiffuse[] = {1.5f, 1.4f, 1.2f, 1.0f};
+  glLightfv(GL_LIGHT0, GL_DIFFUSE, lightDiffuse);
+  GLfloat lowAmbient[] = {0.10f, 0.10f, 0.12f, 1.0f};
+  glLightModelfv(GL_LIGHT_MODEL_AMBIENT, lowAmbient);
 
   glEnable(GL_FOG);
   GLfloat fogColor[] = {0.0f, 0.0f, 0.0f, 1.0f};

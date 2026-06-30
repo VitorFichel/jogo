@@ -38,44 +38,46 @@ int maze[LAB_H][LAB_W] = {
     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}  // 20
 };
 
-// MATRIZ LIMPA! (Os '4's sumiram. Os móveis agora são independentes)
-/*int maze[LAB_H][LAB_W] = {
-    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, 
-    {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 2, 1}, 
-    {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}, 
-    {1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1, 1, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, 
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, 
-    {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
-};
-*/
-
-
-
 std::vector<AABB> worldAABBs;
 GLuint wallTex = 0;
 GLuint floorTex = 0;
 
-// ---- AS CHAVES ----
-bool hasSpawnKey = false, spawnKeyActive = true;
-float spawnKeyX = 5.2f * CELL_SIZE, spawnKeyZ = 1.2f * CELL_SIZE;
+// ---- AS 8 CHAVES ----
+#define NUM_KEYS 8
 
-bool hasMainKey = false, mainKeyActive = true;
-float mainKeyX = 8.0f, mainKeyZ = 28.0f; // Agora flutua exatamente sobre a mesa da biblioteca!
+// Posições fixas de cada chave no mundo
+Key keys8[NUM_KEYS] = {
+    { 5.2f * CELL_SIZE,  1.2f * CELL_SIZE, false },  // 0 – Quarto inicial
+    { 8.0f,             28.0f,             false },  // 1 – Biblioteca (mesa escritório)
+    { 3.0f * CELL_SIZE,  9.0f * CELL_SIZE, false },  // 2 – Corredor topo-esq
+    {16.0f * CELL_SIZE,  3.0f * CELL_SIZE, false },  // 3 – Quarto do fundo
+    { 9.0f * CELL_SIZE, 14.0f * CELL_SIZE, false },  // 4 – Sala central
+    { 3.0f * CELL_SIZE, 17.0f * CELL_SIZE, false },  // 5 – Biblioteca baixo
+    {16.0f * CELL_SIZE, 16.0f * CELL_SIZE, false },  // 6 – Banheiro
+    { 9.0f * CELL_SIZE,  9.0f * CELL_SIZE, false },  // 7 – Meio do labirinto
+};
+
+int keysCollected = 0;
+
+// Ordem embaralhada em que as chaves vão aparecer
+int keyOrder[NUM_KEYS];
+int currentKeyIndex = 0;      // qual slot de keyOrder está ativo agora
+int nextKeyTime    = 0;       // timestamp (ms) em que a próxima chave aparece
+bool waitingDelay  = false;   // true durante o delay de 10s
+
+// Embaralha keyOrder com Fisher-Yates e ativa a primeira chave
+static void shuffleAndStart() {
+    for (int i = 0; i < NUM_KEYS; i++) keyOrder[i] = i;
+    for (int i = NUM_KEYS - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int tmp = keyOrder[i]; keyOrder[i] = keyOrder[j]; keyOrder[j] = tmp;
+    }
+    currentKeyIndex = 0;
+    waitingDelay    = false;
+    nextKeyTime     = 0;
+    // Ativa a primeira chave da ordem
+    keys8[keyOrder[0]].active = true;
+}
 
 // ---- O PROJETO DE INTERIORES COMPLETO ----
 std::vector<Prop3D> houseProps = {
@@ -84,17 +86,15 @@ std::vector<Prop3D> houseProps = {
     // ---------------------------------------------------------
     {"cama.glb",  5.0f,  5.0f, 1.2f, 2.0f, 0.6f, 90.0f, 1.0f, 0},
     {"comoda.obj",         5.0f,  9.0f, 0.8f, 1.5f, 1.2f,  0.0f, 1.0f, 0},
-    {"criado_mudo.obj",    3.0f,  5.0f, 0.6f, 0.6f, 0.6f,  0.0f, 1.0f, 0}, // Novo apoio ao lado da cama
-    {"cadeira_quarto.obj", 7.0f,  8.0f, 0.6f, 0.6f, 1.0f, 45.0f, 1.0f, 0}, // Cadeira virada para a porta
+    {"criado_mudo.obj",    3.0f,  5.0f, 0.6f, 0.6f, 0.6f,  0.0f, 1.0f, 0},
+    {"cadeira_quarto.obj", 7.0f,  8.0f, 0.6f, 0.6f, 1.0f, 45.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 2. Sala Central e Cozinha (Formato U no Meio)
     // ---------------------------------------------------------
-    // Área de Jantar e Estar
     {"mesa_jantar.obj",   21.0f, 31.0f, 2.5f, 1.5f, 0.9f, 90.0f, 1.0f, 0},
     {"sofa.glb",          21.0f, 25.0f, 2.5f, 1.0f, 1.0f,  0.0f, 1.0f, 0},
-    {"rack_tv.obj",       21.0f, 21.5f, 2.0f, 0.6f, 0.6f,  0.0f, 1.0f, 0}, // Nova TV na frente do sofá
-    // Área da Cozinha (Na parede direita da sala central)
+    {"rack_tv.obj",       21.0f, 21.5f, 2.0f, 0.6f, 0.6f,  0.0f, 1.0f, 0},
     {"geladeira.obj",     27.0f, 30.0f, 1.0f, 1.0f, 2.0f, -90.0f, 1.0f, 0},
     {"fogao.obj",         27.0f, 33.0f, 0.9f, 0.9f, 1.0f, -90.0f, 1.0f, 0},
     {"armario_cozinha.obj",27.0f, 36.0f, 2.0f, 0.8f, 2.2f,-90.0f, 1.0f, 0},
@@ -103,16 +103,16 @@ std::vector<Prop3D> houseProps = {
     // 3. Biblioteca / Escritório (Baixo-Esquerdo)
     // ---------------------------------------------------------
     {"estante.glb", 2.0f, 34.0f, 0.8f, 4.0f, 2.5f,  0.0f, 1.0f, 0},
-    {"estante_livros_2.obj",10.0f,38.0f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0}, // Nova estante formando um L
+    {"estante_livros_2.obj",10.0f,38.0f, 3.0f, 0.8f, 2.5f, 90.0f, 1.0f, 0},
     {"mesa_escritorio.obj",6.0f, 32.0f, 1.8f, 0.8f, 0.8f,  0.0f, 1.0f, 0},
-    {"cadeira_escritorio.obj",6.0f,30.5f, 0.7f, 0.7f, 1.2f, 180.0f, 1.0f, 0}, // Cadeira do computador
+    {"cadeira_escritorio.obj",6.0f,30.5f, 0.7f, 0.7f, 1.2f, 180.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 4. Quarto do Fundo (Topo-Direito) - O refúgio
     // ---------------------------------------------------------
     {"cama.glb",    37.0f,  7.0f, 1.6f, 2.2f, 0.6f,  0.0f, 1.0f, 0},
     {"guarda_roupa.obj",  32.0f, 11.0f, 2.0f, 0.8f, 2.2f, 90.0f, 1.0f, 0},
-    {"poltrona.obj",      37.0f, 13.0f, 1.0f, 1.0f, 1.0f,-45.0f, 1.0f, 0}, // Poltrona de leitura no canto
+    {"poltrona.obj",      37.0f, 13.0f, 1.0f, 1.0f, 1.0f,-45.0f, 1.0f, 0},
 
     // ---------------------------------------------------------
     // 5. Banheiro Sombrio (Baixo-Direito)
@@ -159,10 +159,8 @@ GLuint loadPropOBJ(std::string filename) {
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials(); 
 
-    // CONFIRMAÇÃO: Mostra no console quantos materiais foram lidos com sucesso do .mtl
     printf("[Movel] %s carregado com sucesso. Materiais lidos: %d\n", filename.c_str(), (int)materials.size());
 
-    // Pré-carrega todas as imagens de textura exigidas por este modelo para evitar sobrecarga
     for (const auto& mat : materials) {
         if (!mat.diffuse_texname.empty() && loadedPropTextures.find(mat.diffuse_texname) == loadedPropTextures.end()) {
             std::string texPath = basepath + mat.diffuse_texname;
@@ -186,17 +184,14 @@ GLuint loadPropOBJ(std::string filename) {
             int mat_id = shapes[s].mesh.material_ids[f];
             GLuint currentTex = 0;
             
-            if (mat_id >= 0 && mat_id < materials.size()) {
+            if (mat_id >= 0 && mat_id < (int)materials.size()) {
                 GLfloat mat_diffuse[] = {
                     materials[mat_id].diffuse[0],
                     materials[mat_id].diffuse[1],
                     materials[mat_id].diffuse[2],
                     1.0f
                 };
-                // Solução 1: Aplica a cor via iluminação de material
                 glMaterialfv(GL_FRONT, GL_DIFFUSE, mat_diffuse);
-                
-                // Solução 2: Força a aplicação direta da cor para neutralizar o conflito com GL_COLOR_MATERIAL
                 glColor3f(materials[mat_id].diffuse[0], materials[mat_id].diffuse[1], materials[mat_id].diffuse[2]);
                 
                 if (!materials[mat_id].diffuse_texname.empty()) {
@@ -208,7 +203,6 @@ GLuint loadPropOBJ(std::string filename) {
                 glColor3f(0.4f, 0.3f, 0.2f);
             }
 
-            // Ativa a textura de imagem caso ela exista para esta face
             if (currentTex != 0) {
                 glEnable(GL_TEXTURE_2D);
                 glBindTexture(GL_TEXTURE_2D, currentTex);
@@ -262,30 +256,25 @@ GLuint loadPropGLB(std::string filename) {
         return 0;
     }
     
-    // Carrega os buffers binários internos do ficheiro
     cgltf_load_buffers(&options, data, filepath.c_str());
 
     GLuint list = glGenLists(1);
     glNewList(list, GL_COMPILE);
 
-    // Percorre todas as malhas do modelo
     for (cgltf_size m = 0; m < data->meshes_count; ++m) {
         cgltf_mesh* mesh = &data->meshes[m];
         
         for (cgltf_size p = 0; p < mesh->primitives_count; ++p) {
             cgltf_primitive* primitive = &mesh->primitives[p];
             
-            // 1. CARREGAR A TEXTURA EMBUTIDA DA MEMÓRIA
             GLuint texID = 0;
             if (primitive->material && primitive->material->has_pbr_metallic_roughness) {
                 cgltf_texture_view* texView = &primitive->material->pbr_metallic_roughness.base_color_texture;
                 if (texView->texture && texView->texture->image) {
                     cgltf_image* image = texView->texture->image;
                     if (image->buffer_view) {
-                        // Extrai os bytes da imagem (JPEG/PNG) de dentro do GLB
                         unsigned char* img_bytes = (unsigned char*)image->buffer_view->buffer->data + image->buffer_view->offset;
                         int w, h, channels;
-                        // O stb_image descodifica a imagem direto da RAM
                         unsigned char* pixels = stbi_load_from_memory(img_bytes, image->buffer_view->size, &w, &h, &channels, 4);
                         if (pixels) {
                             glGenTextures(1, &texID);
@@ -299,17 +288,15 @@ GLuint loadPropGLB(std::string filename) {
                 }
             }
 
-            // Ativa a textura lida
             if (texID != 0) {
                 glEnable(GL_TEXTURE_2D);
                 glBindTexture(GL_TEXTURE_2D, texID);
-                glColor3f(1.0f, 1.0f, 1.0f); // Previne contaminação de cor
+                glColor3f(1.0f, 1.0f, 1.0f);
             } else {
                 glDisable(GL_TEXTURE_2D);
-                glColor3f(0.5f, 0.5f, 0.5f); // Cor base caso não haja textura
+                glColor3f(0.5f, 0.5f, 0.5f);
             }
 
-            // 2. EXTRAIR GEOMETRIA (Posição, Normal, UV)
             cgltf_accessor* pos_acc = NULL;
             cgltf_accessor* norm_acc = NULL;
             cgltf_accessor* uv_acc = NULL;
@@ -320,7 +307,6 @@ GLuint loadPropGLB(std::string filename) {
                 else if (primitive->attributes[a].type == cgltf_attribute_type_texcoord) uv_acc = primitive->attributes[a].data;
             }
 
-            // 3. DESENHAR OS TRIÂNGULOS (Com segurança de tipos via cgltf)
             if (primitive->indices && pos_acc) {
                 glBegin(GL_TRIANGLES);
                 for (cgltf_size i = 0; i < primitive->indices->count; ++i) {
@@ -334,7 +320,7 @@ GLuint loadPropGLB(std::string filename) {
                     if (uv_acc) {
                         float uv[2];
                         cgltf_accessor_read_float(uv_acc, idx, uv, 2);
-                        glTexCoord2f(uv[0], 1.0f - uv[1]); // Eixo Y UV invertido para OpenGL Clássico
+                        glTexCoord2f(uv[0], 1.0f - uv[1]);
                     }
                     float v[3];
                     cgltf_accessor_read_float(pos_acc, idx, v, 3);
@@ -347,7 +333,7 @@ GLuint loadPropGLB(std::string filename) {
     }
     
     glEndList();
-    cgltf_free(data); // Limpa a memória RAM 
+    cgltf_free(data);
     return list;
 }
 
@@ -355,7 +341,6 @@ void buildAABBs() {
     worldAABBs.clear();
     float WT = 0.15f; 
 
-    // 1. Gera Paredes e Portas a partir da Matriz
     for (int row = 0; row < LAB_H; row++) {
         for (int col = 0; col < LAB_W; col++) {
             float cx = col * CELL_SIZE + CELL_SIZE / 2.0f;
@@ -395,9 +380,7 @@ void buildAABBs() {
         }
     }
 
-    // 2. Gera a física dos Móveis baseada na lista houseProps
     for (const auto& prop : houseProps) {
-        // Usa a largura (w) e profundidade (d) exatas de cada móvel para o AABB do Tipo 4
         worldAABBs.push_back({prop.x - prop.w/2.0f, prop.z - prop.d/2.0f, prop.x + prop.w/2.0f, prop.z + prop.d/2.0f, 4, true});
     }
 }
@@ -407,7 +390,6 @@ void mazeInit() {
     floorTex = loadTexture("assets/textures/floor.jpg");
     
     for (auto& prop : houseProps) {
-        // Verifica as últimas 4 letras do ficheiro
         if (prop.objFilename.find(".glb") != std::string::npos) {
             prop.displayList = loadPropGLB(prop.objFilename);
             printf("[GLB] Carregado: %s\n", prop.objFilename.c_str());
@@ -416,10 +398,14 @@ void mazeInit() {
         }
     }
     
-    buildAABBs(); 
+    buildAABBs();
+
+    // Reseta e embaralha a ordem das chaves
+    keysCollected = 0;
+    for (int i = 0; i < NUM_KEYS; i++) keys8[i].active = false;
+    shuffleAndStart();
 }
 
-// ... (MANTER A FUNÇÃO drawSubdividedFace IGUAL AQUI) ...
 static void drawSubdividedFace(float x0, float y0, float z0, float dx1, float dy1, float dz1, float dx2, float dy2, float dz2, float width, float height, float nx, float ny, float nz) {
     float step = 1.0f; float texScale = 0.5f; 
     glNormal3f(nx, ny, nz); glBegin(GL_QUADS);
@@ -475,7 +461,14 @@ void mazeDraw() {
     for (const auto& box : worldAABBs) {
         if (!box.active) continue; 
         if (box.type == 1) { glColor3f(1.0f, 1.0f, 1.0f); drawAABB(box, WALL_HEIGHT); }
-        else if (box.type == 2) { glColor3f(0.0f, 0.8f, 0.2f); drawAABB(box, WALL_HEIGHT); }
+        else if (box.type == 2) {
+            // Saída: verde se tiver todas as chaves, vermelha se não
+            if (keysCollected >= NUM_KEYS)
+                glColor3f(0.0f, 0.8f, 0.2f);
+            else
+                glColor3f(0.8f, 0.1f, 0.1f);
+            drawAABB(box, WALL_HEIGHT);
+        }
         else if (box.type == 3) { glColor3f(1.0f, 1.0f, 1.0f); drawDoorHeader(box, 2.0f, WALL_HEIGHT); }
         else if (box.type == 5) { glColor3f(0.5f, 0.5f, 0.6f); drawAABB(box, 2.0f); }
         else if (box.type == 6) { glColor3f(0.3f, 0.15f, 0.05f); drawAABB(box, 2.0f); }
@@ -485,7 +478,6 @@ void mazeDraw() {
     // 3. DESENHO DOS MÓVEIS
     for (const auto& prop : houseProps) {
         if (prop.displayList != 0) {
-            // Plano A: O arquivo .obj existe, vamos desenhá-lo!
             glPushMatrix();
             glTranslatef(prop.x, 0.0f, prop.z);
             glRotatef(prop.rotY, 0, 1, 0);
@@ -494,9 +486,8 @@ void mazeDraw() {
             glCallList(prop.displayList);
             glPopMatrix();
         } else {
-            // Plano B: Arquivo ausente. Desenha uma caixa genérica simulando a colisão real.
             glDisable(GL_TEXTURE_2D);
-            glColor3f(0.4f, 0.2f, 0.1f); // Castanho escuro
+            glColor3f(0.4f, 0.2f, 0.1f);
             glPushMatrix();
             glTranslatef(prop.x, prop.h / 2.0f, prop.z);
             glScalef(prop.w, prop.h, prop.d);
@@ -505,20 +496,26 @@ void mazeDraw() {
         }
     }
 
-    // CHAVES (Mantidas Iguais)
-    if (spawnKeyActive) {
-        glPushMatrix(); glTranslatef(spawnKeyX, 1.0f + sin(glutGet(GLUT_ELAPSED_TIME)/200.0f)*0.1f, spawnKeyZ);
-        glRotatef(glutGet(GLUT_ELAPSED_TIME)/8.0f, 0, 1, 0); glScalef(0.12f, 0.12f, 0.12f);
-        glColor3f(0.7f, 0.7f, 0.8f); glutSolidCube(1.0f); glPopMatrix();
-    }
-    if (mainKeyActive) {
-        glPushMatrix(); glTranslatef(mainKeyX, 1.0f + sin(glutGet(GLUT_ELAPSED_TIME)/300.0f)*0.1f, mainKeyZ);
-        glRotatef(glutGet(GLUT_ELAPSED_TIME)/10.0f, 0, 1, 0); glScalef(0.15f, 0.15f, 0.15f);
-        glColor3f(1.0f, 0.8f, 0.0f); glutSolidCube(1.0f); glPopMatrix();
+    // ---- DESENHA AS 8 CHAVES ----
+    int now = glutGet(GLUT_ELAPSED_TIME);
+    for (int i = 0; i < NUM_KEYS; i++) {
+        if (!keys8[i].active) continue;
+        float bob = 1.0f + sin(now / 200.0f + i * 0.8f) * 0.1f;
+        float rot = (now / 8.0f + i * 45.0f);
+        glPushMatrix();
+        glTranslatef(keys8[i].x, bob, keys8[i].z);
+        glRotatef(rot, 0, 1, 0);
+        glScalef(0.14f, 0.14f, 0.14f);
+        // Alterna a cor entre prata e dourado pra distinguir
+        if (i % 2 == 0)
+            glColor3f(0.9f, 0.8f, 0.1f); // dourado
+        else
+            glColor3f(0.7f, 0.7f, 0.85f); // prata
+        glutSolidCube(1.0f);
+        glPopMatrix();
     }
 }
 
-// ... (MANTENHA checkCollisionAABB, checkExitAABB e updateInteractables IGUAIS AQUI) ...
 bool checkCollisionAABB(float px, float pz, float radius) {
     float pMinX = px - radius, pMaxX = px + radius; float pMinZ = pz - radius, pMaxZ = pz + radius;
     for (const auto& box : worldAABBs) {
@@ -532,6 +529,8 @@ bool checkCollisionAABB(float px, float pz, float radius) {
 }
 
 bool checkExitAABB(float px, float pz) {
+    // Só conta como saída se tiver todas as 8 chaves
+    if (keysCollected < NUM_KEYS) return false;
     for (const auto& box : worldAABBs) {
         if (box.type == 2) {
             if (px > box.minX && px < box.maxX && pz > box.minZ && pz < box.maxZ) return true;
@@ -541,23 +540,44 @@ bool checkExitAABB(float px, float pz) {
 }
 
 void updateInteractables(float px, float pz, float radius) {
-    if (spawnKeyActive) {
-        float dx = px - spawnKeyX; float dz = pz - spawnKeyZ;
-        if (sqrt(dx*dx + dz*dz) < 1.0f) { spawnKeyActive = false; hasSpawnKey = true; }
+    int now = glutGet(GLUT_ELAPSED_TIME);
+
+    // Gerencia o delay e a ativação da próxima chave
+    if (waitingDelay && now >= nextKeyTime) {
+        waitingDelay = false;
+        if (currentKeyIndex < NUM_KEYS)
+            keys8[keyOrder[currentKeyIndex]].active = true;
     }
-    if (mainKeyActive) {
-        float dx = px - mainKeyX; float dz = pz - mainKeyZ;
-        if (sqrt(dx*dx + dz*dz) < 1.0f) { mainKeyActive = false; hasMainKey = true; }
+
+    // Coleta a chave atualmente ativa
+    if (!waitingDelay && currentKeyIndex < NUM_KEYS) {
+        int idx = keyOrder[currentKeyIndex];
+        if (keys8[idx].active) {
+            float dx = px - keys8[idx].x;
+            float dz = pz - keys8[idx].z;
+            if (sqrt(dx*dx + dz*dz) < 1.0f) {
+                keys8[idx].active = false;
+                keysCollected++;
+                currentKeyIndex++;
+                // Inicia o delay de 10s antes de mostrar a próxima
+                if (currentKeyIndex < NUM_KEYS) {
+                    waitingDelay = true;
+                    nextKeyTime  = now + 10000;
+                }
+            }
+        }
     }
+
+    // Lógica de portas (inalterada)
     float pMinX = px - radius - 0.2f, pMaxX = px + radius + 0.2f;
     float pMinZ = pz - radius - 0.2f, pMaxZ = pz + radius + 0.2f;
     for (auto& box : worldAABBs) {
         if (!box.active) continue;
-        if (box.type == 5 && hasSpawnKey) {
-            if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) box.active = false; 
+        if (box.type == 5) {
+            if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) box.active = false;
         }
-        if (box.type == 6 && hasMainKey) {
-            if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) box.active = false; 
+        if (box.type == 6) {
+            if (pMaxX > box.minX && pMinX < box.maxX && pMaxZ > box.minZ && pMinZ < box.maxZ) box.active = false;
         }
     }
 }

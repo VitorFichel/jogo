@@ -9,6 +9,7 @@
 #define LAB_H 21
 #define CELL_SIZE 2.0f
 #define WALL_HEIGHT 3.2f 
+#define NUM_KEYS 8
 
 extern int maze[LAB_H][LAB_W];
 
@@ -17,6 +18,11 @@ struct AABB {
     float maxX, maxZ;
     int type; // 1=Parede, 2=Saída, 3=Verga, 4=Móvel, 5=Porta Inicial, 6=Portas Comuns
     bool active; 
+};
+
+struct Key {
+    float x, z;
+    bool active;
 };
 
 // ---- NOVO SISTEMA DE MÓVEIS (PROPS) ----
@@ -28,6 +34,9 @@ struct Prop3D {
     float scale;             // Escala do modelo 3D
     GLuint displayList;      // Guarda o modelo 3D na placa de vídeo
 };
+
+extern Key keys8[NUM_KEYS];
+extern int keysCollected;
 extern std::vector<Prop3D> houseProps;
 // ----------------------------------------
 
