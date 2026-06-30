@@ -9,7 +9,7 @@
 #define LAB_H 21
 #define CELL_SIZE 2.0f
 #define WALL_HEIGHT 3.2f 
-#define NUM_KEYS 8
+#define NUM_KEYS 4
 
 extern int maze[LAB_H][LAB_W];
 
@@ -43,6 +43,13 @@ extern std::vector<Prop3D> houseProps;
 extern GLuint keyModelList; // display list do modelo 3D único da chave (chave.glb/.obj)
 extern GLuint doorModelList; // display list do modelo 3D da porta de saída (porta.glb/.obj)
 // ----------------------------------------
+
+// ---- AVISO DE SAÍDA TRANCADA ----
+// main.cpp lê essas variáveis pra desenhar um aviso na HUD quando o jogador
+// encostar na porta de saída sem ter coletado as 8 chaves.
+extern bool showExitLockedWarning;
+extern int  exitLockedWarningTime;
+// ----------------------------------
 
 extern std::vector<AABB> worldAABBs;
 

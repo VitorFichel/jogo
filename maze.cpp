@@ -16,7 +16,7 @@
 int maze[LAB_H][LAB_W] = {
     // 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20
     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, // 0
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 2, 1}, // 1 (Saída em 1,19)
+    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // 1
     {1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1}, // 2
     {1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // 3
     {1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1}, // 4
@@ -24,7 +24,7 @@ int maze[LAB_H][LAB_W] = {
     {1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 1}, // 6
     {1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // 7 (Porta Topo-Esq, agora aberta até a ala nova)
     {1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1}, // 8 (Porta Topo-Dir)
-    {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // 9
+    {2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}, // 9 (Saída no corredor longo, parede esquerda)
     {1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1}, // 10 (Parede Sala Central)
     {1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1}, // 11 (Porta Sala Central)
     {1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1}, // 12 (Portas Baixo-Esq e Baixo-Dir)
@@ -42,24 +42,24 @@ std::vector<AABB> worldAABBs;
 GLuint wallTex = 0;
 GLuint floorTex = 0;
 
-// ---- AS 8 CHAVES ----
-#define NUM_KEYS 8
+// ---- AS 4 CHAVES ----
+// NUM_KEYS é definido em maze.h
 
 // Posições fixas de cada chave no mundo
 Key keys8[NUM_KEYS] = {
     { 5.2f * CELL_SIZE,  1.2f * CELL_SIZE, false },  // 0 – Quarto inicial
     { 8.0f,             28.0f,             false },  // 1 – Biblioteca (mesa escritório)
-    { 3.0f * CELL_SIZE,  9.0f * CELL_SIZE, false },  // 2 – Corredor topo-esq
-    {16.0f * CELL_SIZE,  3.0f * CELL_SIZE, false },  // 3 – Quarto do fundo
-    { 9.0f * CELL_SIZE, 14.0f * CELL_SIZE, false },  // 4 – Sala central
-    { 3.0f * CELL_SIZE, 17.0f * CELL_SIZE, false },  // 5 – Biblioteca baixo
-    {16.0f * CELL_SIZE, 16.0f * CELL_SIZE, false },  // 6 – Banheiro
-    { 9.0f * CELL_SIZE,  9.0f * CELL_SIZE, false },  // 7 – Meio do labirinto
+    {16.0f * CELL_SIZE,  3.0f * CELL_SIZE, false },  // 2 – Quarto do fundo
+    { 9.0f * CELL_SIZE, 14.0f * CELL_SIZE, false },  // 3 – Sala central
 };
 
 int keysCollected = 0;
 GLuint keyModelList = 0;
 GLuint doorModelList = 0;
+float keyModelAutoScale = 1.0f;
+float keyModelBaseYOffset = 0.0f;
+float doorModelAutoScale = 1.0f;
+float doorModelBaseYOffset = 0.0f;
 
 // Ordem embaralhada em que as chaves vão aparecer
 int keyOrder[NUM_KEYS];
@@ -402,8 +402,30 @@ void buildAABBs() {
                     worldAABBs.push_back({cx - WT/2.0f, cz - gap/2.0f, cx + WT/2.0f, cz + gap/2.0f, doorType, true});
                 }
             } else if (type == 2) {
+                // Saída: construída igual a uma porta normal (tipo 3), com as
+                // duas faixas de parede ao redor do vão preservadas; o vão
+                // central fica marcado como tipo 2 (saída) em vez de 3.
+                bool horizontal = (col > 0 && col < LAB_W - 1 && maze[row][col-1] == 1 && maze[row][col+1] == 1);
+                // Se a saída está na borda do mapa, deduz a orientação pelo
+                // lado da borda (parede lateral -> vão no eixo Z; parede de
+                // topo/baixo -> vão no eixo X).
+                bool onLeftBorder   = (col == 0);
+                bool onRightBorder  = (col == LAB_W - 1);
+                bool onTopBorder    = (row == 0);
+                bool onBottomBorder = (row == LAB_H - 1);
+                if (onLeftBorder || onRightBorder) horizontal = false;
+                else if (onTopBorder || onBottomBorder) horizontal = true;
+
                 float gap = 1.0f;
-                worldAABBs.push_back({cx - gap/2.0f, cz - gap/2.0f, cx + gap/2.0f, cz + gap/2.0f, 2, true});
+                if (horizontal) {
+                    worldAABBs.push_back({cx - CELL_SIZE/2.0f, cz - WT, cx - gap/2.0f, cz + WT, 1, true});
+                    worldAABBs.push_back({cx + gap/2.0f, cz - WT, cx + CELL_SIZE/2.0f, cz + WT, 1, true});
+                    worldAABBs.push_back({cx - gap/2.0f, cz - WT, cx + gap/2.0f, cz + WT, 2, true});
+                } else {
+                    worldAABBs.push_back({cx - WT, cz - CELL_SIZE/2.0f, cx + WT, cz - gap/2.0f, 1, true});
+                    worldAABBs.push_back({cx - WT, cz + gap/2.0f, cx + WT, cz + CELL_SIZE/2.0f, 1, true});
+                    worldAABBs.push_back({cx - WT, cz - gap/2.0f, cx + WT, cz + gap/2.0f, 2, true});
+                }
             }
         }
     }
@@ -418,13 +440,28 @@ void mazeInit() {
     floorTex = loadTexture("assets/textures/floor.jpg");
 
     // Carrega o modelo único usado para todas as 8 chaves (tenta .glb, depois .obj)
-    keyModelList = loadPropGLB("chave.glb", nullptr, nullptr);
-    if (keyModelList == 0) keyModelList = loadPropOBJ("chave.obj");
+    keyModelList = loadPropGLB("chave.glb", &keyModelAutoScale, &keyModelBaseYOffset);
+    if (keyModelList == 0) { keyModelList = loadPropOBJ("chave.obj"); keyModelAutoScale = 1.0f; keyModelBaseYOffset = 0.0f; }
     if (keyModelList == 0) printf("Aviso: modelo da chave nao encontrado (assets/moveis/chave.glb ou .obj). Usando cubo como fallback.\n");
+    else {
+        // loadPropGLB normaliza pra PROP_TARGET_HEIGHT (altura de móvel);
+        // reescala pro tamanho compacto de uma chave (~0.3 unidades).
+        const float KEY_TARGET_HEIGHT = 0.3f;
+        keyModelAutoScale *= (KEY_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
+        keyModelBaseYOffset *= (KEY_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
+    }
 
-    doorModelList = loadPropGLB("porta.glb", nullptr, nullptr);
-    if (doorModelList == 0) doorModelList = loadPropOBJ("porta.obj");
-    if (doorModelList == 0) printf("Aviso: modelo da porta nao encontrado (assets/moveis/porta.glb ou .obj). Usando geometria procedural como fallback.\n");
+    doorModelList = loadPropGLB("porta.glb", &doorModelAutoScale, &doorModelBaseYOffset);
+    if (doorModelList == 0) { doorModelList = loadPropOBJ("porta.obj"); doorModelAutoScale = 1.0f; doorModelBaseYOffset = 0.0f; }
+    if (doorModelList == 0) {
+        printf("Aviso: modelo da porta nao encontrado (assets/moveis/porta.glb ou .obj). Usando geometria procedural como fallback.\n");
+    } else {
+        // loadPropGLB normaliza pra PROP_TARGET_HEIGHT (móveis); reescala pra
+        // caber no vão de porta padrão do labirinto (altura ~2.0 unidades).
+        const float DOOR_TARGET_HEIGHT = 2.0f;
+        doorModelAutoScale *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
+        doorModelBaseYOffset *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
+    }
 
     for (auto& prop : houseProps) {
         if (prop.objFilename.find(".glb") != std::string::npos) {
@@ -509,8 +546,10 @@ void mazeDraw() {
         if (!box.active) continue; 
         if (box.type == 1) { glColor3f(1.0f, 1.0f, 1.0f); drawAABB(box, WALL_HEIGHT); }
         else if (box.type == 2) {
-            // Saída: porta sempre visível. Vermelha/trancada sem todas as chaves,
-            // verde/destrancada quando completar.
+            // Saída: trancada vira um painel sólido fechando o vão inteiro
+            // (parece fisicamente uma porta fechada, batendo com a colisão
+            // sólida que ela já tem). Destrancada vira só a verga em cima,
+            // deixando o vão livre pra atravessar.
             bool unlocked = (keysCollected >= NUM_KEYS);
             if (unlocked)
                 glColor3f(0.0f, 0.8f, 0.2f);
@@ -526,16 +565,22 @@ void mazeDraw() {
 
                 glDisable(GL_TEXTURE_2D);
                 glPushMatrix();
-                glTranslatef(cx, 0.0f, cz);
+                glTranslatef(cx, doorModelBaseYOffset, cz);
                 glRotatef(horizontal ? 0.0f : 90.0f, 0, 1, 0);
-                glScalef(1.0f, 1.0f, 1.0f); // ajuste a escala conforme o tamanho real do asset
+                glScalef(doorModelAutoScale, doorModelAutoScale, doorModelAutoScale);
                 glCallList(doorModelList);
                 glPopMatrix();
                 glEnable(GL_TEXTURE_2D);
                 glBindTexture(GL_TEXTURE_2D, wallTex);
                 glColor3f(1.0f, 1.0f, 1.0f);
-            } else {
+            } else if (unlocked) {
                 drawDoorHeader(box, 2.0f, WALL_HEIGHT);
+            } else {
+                glDisable(GL_TEXTURE_2D);
+                drawAABB(box, WALL_HEIGHT);
+                glEnable(GL_TEXTURE_2D);
+                glBindTexture(GL_TEXTURE_2D, wallTex);
+                glColor3f(1.0f, 1.0f, 1.0f);
             }
         }
         else if (box.type == 3) { glColor3f(1.0f, 1.0f, 1.0f); drawDoorHeader(box, 2.0f, WALL_HEIGHT); }
@@ -579,7 +624,7 @@ void mazeDraw() {
         glRotatef(rot, 0, 1, 0);
 
         if (keyModelList != 0) {
-            glScalef(0.001f, 0.001f, 0.001f);
+            glScalef(keyModelAutoScale, keyModelAutoScale, keyModelAutoScale);
             glEnable(GL_LIGHTING);
             glColor3f(1.0f, 1.0f, 1.0f);
             glCallList(keyModelList);
@@ -610,12 +655,33 @@ bool checkCollisionAABB(float px, float pz, float radius) {
     return false;
 }
 
+// ---- AVISO DE "FALTAM CHAVES" AO TOCAR NA SAÍDA TRANCADA ----
+// main.cpp lê showExitLockedWarning/exitLockedWarningTime pra desenhar um
+// aviso na HUD quando o jogador encostar na porta sem ter as 8 chaves.
+bool showExitLockedWarning = false;
+int exitLockedWarningTime = 0;
+static const int EXIT_WARNING_COOLDOWN_MS = 2500; // intervalo mínimo entre re-disparos do aviso
+
 bool checkExitAABB(float px, float pz) {
-    // Só conta como saída se tiver todas as 8 chaves
-    if (keysCollected < NUM_KEYS) return false;
+    // Margem de "toque" um pouco maior que o vão real da porta, pra detectar
+    // o jogador encostando mesmo que a colisão física já o pare um pouco antes.
+    const float touchMargin = 0.6f;
+
     for (const auto& box : worldAABBs) {
-        if (box.type == 2) {
-            if (px > box.minX && px < box.maxX && pz > box.minZ && pz < box.maxZ) return true;
+        if (box.type != 2) continue;
+        bool touching = (px > box.minX - touchMargin && px < box.maxX + touchMargin &&
+                          pz > box.minZ - touchMargin && pz < box.maxZ + touchMargin);
+        if (!touching) continue;
+
+        if (keysCollected >= NUM_KEYS) {
+            return true; // saída destrancada e o jogador está nela: vitória
+        } else {
+            int now = glutGet(GLUT_ELAPSED_TIME);
+            if (now - exitLockedWarningTime > EXIT_WARNING_COOLDOWN_MS) {
+                showExitLockedWarning = true;
+                exitLockedWarningTime = now;
+            }
+            return false;
         }
     }
     return false;

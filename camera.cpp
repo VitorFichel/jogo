@@ -5,7 +5,7 @@
 #include <cmath>
 #include <cstdlib> 
 
-float px = 1.5f * CELL_SIZE, py = 1.0f, pz = 1.5f * CELL_SIZE;
+float px = 1.5f * CELL_SIZE, py = 1.65f, pz = 1.5f * CELL_SIZE;
 float yaw = -PI / 2;
 float pitch = 0.0f;
 
@@ -82,6 +82,11 @@ void cameraApplyLight() {
 }
 
 void cameraMouseMotion(int x, int y) {
+  // Durante o jumpscare (e telas de WON/LOST) a câmera fica travada — o
+  // mouse não deve mais girar a visão, senão "cameraLockOnPoint" perderia o
+  // efeito no próximo frame.
+  if (state != PLAYING) return;
+
   int cx = glutGet(GLUT_WINDOW_WIDTH) / 2;
   int cy = glutGet(GLUT_WINDOW_HEIGHT) / 2;
 
@@ -144,7 +149,7 @@ void cameraUpdate() {
   lastCameraTime = now;
 
   if (dt <= 0.001f) return; 
-  if (dt > 0.1f) dt = 0.1f;
+  if (dt > 0.25f) dt = 0.25f;
 
   if (currentStage != NORMAL && now > currentStageEndTime) {
       switch (currentStage) {
@@ -168,9 +173,9 @@ void cameraUpdate() {
       nextSequenceCheckTime = now + 200; 
   }
 
-  float baseSpeed = 3.0f;
-  float sprintSpeed = 6.0f; 
-  float exhaustedSpeed = 2.0f; 
+  float baseSpeed = 10.0f;
+  float sprintSpeed = 12.0f; 
+  float exhaustedSpeed = 8.0f; 
   float speed = baseSpeed;
   
   bool isMoving = (keys['w'] || keys['s'] || keys['a'] || keys['d']);
@@ -223,4 +228,25 @@ void cameraUpdate() {
   if (checkExitAABB(px, pz)) {
     state = WON;
   }
+}
+
+void cameraLockOnPoint(float targetX, float targetY, float targetZ) {
+  // Olha diretamente pro ponto alvo (ex.: o rosto do monstro) a partir da
+  // posição atual da câmera.
+  float dx = targetX - px;
+  float dy = targetY - py;
+  float dz = targetZ - pz;
+
+  float horizDist = sqrt(dx * dx + dz * dz);
+
+  yaw = atan2(dz, dx);
+  pitch = atan2(dy, horizDist);
+  if (pitch > 1.5f) pitch = 1.5f;
+  if (pitch < -1.5f) pitch = -1.5f;
+
+  // Zera o head-bobbing pra a câmera ficar perfeitamente parada (sem
+  // tremedeira) enquanto está "travada" no jumpscare.
+  bobOffsetX = 0.0f;
+  bobOffsetY = 0.0f;
+  bobPhase = 0.0f;
 }

@@ -16,6 +16,11 @@ static const float MODEL_Y_OFFSET = 0.0f;
 static const float MODEL_ROTATION_OFFSET = 0.0f; 
 static const float MODEL_ROTATION_X = 0.0f;
 
+// Altura aproximada (eixo Y) do rosto do monstro, em unidades de mundo,
+// usada pra travar a câmera nele durante o jumpscare. Se o modelo do
+// monstro for maior/menor que um humano padrão, ajuste esse valor.
+static const float MONSTER_FACE_HEIGHT = 1.6f;
+
 // ---- SISTEMA DE ANIMAÇÃO DO INIMIGO (CORES MTL) ----
 const int NUM_FRAMES = 22; 
 static GLuint monsterFrames[NUM_FRAMES];
@@ -116,6 +121,15 @@ static int lastUpdateTime = 0;
 
 static float targetX, targetZ;
 static bool hasTarget = false;
+
+// ---- DETECÇÃO SIMPLES DE "PRESO" ----
+// Se o inimigo não mudar de posição (de fato) por alguns segundos,
+// força um retraçado de rota. Roda de forma independente do movimento
+// por frame, então não interfere na lógica de slide/colisão normal.
+static float lastStuckCheckX = 0.0f, lastStuckCheckZ = 0.0f;
+static int lastStuckCheckTime = 0;
+static const int STUCK_CHECK_SECONDS_MS = 3000; // poucos segundos
+static const float STUCK_MIN_DISTANCE = 0.3f;   // precisa ter andado isso no período, senão está "preso"
 
 // Direção que o inimigo está "olhando" (baseada no movimento, não no player)
 static float facingDirX = 0.0f, facingDirZ = 1.0f;
@@ -304,10 +318,20 @@ void enemyUpdate() {
     if (playerDist < 0.6f && state == PLAYING) {
         state = JUMPSCARE;
         jumpscareStartTime = now;
-        yaw = atan2(ez - pz, ex - px);
-        pitch = 0.2f; 
-        ex = px + cos(yaw) * 0.3f;
-        ez = pz + sin(yaw) * 0.3f;
+
+        // Puxa o monstro bem pra perto da câmera (efeito de "lunge").
+        float approachYaw = atan2(ez - pz, ex - px);
+        ex = px + cos(approachYaw) * 0.3f;
+        ez = pz + sin(approachYaw) * 0.3f;
+
+        // Trava a câmera olhando fixo pro rosto do monstro (sem mais
+        // responder ao mouse nem ao head-bob enquanto durar o susto).
+        cameraLockOnPoint(ex, MONSTER_FACE_HEIGHT, ez);
+
+        // O som do jumpscare é disparado automaticamente por audioUpdate()
+        // assim que ele detecta state == JUMPSCARE — não precisa chamar
+        // nada de áudio aqui.
+
         isChasing = false;
         return; 
     }
@@ -388,6 +412,27 @@ void enemyUpdate() {
     } else if (dist > 0.0001f) {
         ex = targetX;
         ez = targetZ;
+    }
+
+    // ---- CHECAGEM SIMPLES DE "PRESO" ----
+    // Roda independente do movimento acima: se o inimigo não andou pelo
+    // menos STUCK_MIN_DISTANCE nos últimos STUCK_CHECK_SECONDS_MS, força um
+    // retraçado de rota. Como roda em intervalo fixo e não depende de eixo
+    // específico, qualquer tipo de travamento (total ou deslizando contra
+    // uma quina) acaba sendo destravado quando o tempo se esgota.
+    if (lastStuckCheckTime == 0) {
+        lastStuckCheckTime = now;
+        lastStuckCheckX = ex;
+        lastStuckCheckZ = ez;
+    } else if (now - lastStuckCheckTime > STUCK_CHECK_SECONDS_MS) {
+        float movedDist = sqrt((ex - lastStuckCheckX) * (ex - lastStuckCheckX) + (ez - lastStuckCheckZ) * (ez - lastStuckCheckZ));
+        if (movedDist < STUCK_MIN_DISTANCE) {
+            recalcPathTo((aiState == CHASE) ? lastKnownX : patrolDestX, (aiState == CHASE) ? lastKnownZ : patrolDestZ);
+            lastRecalcTime = now;
+        }
+        lastStuckCheckTime = now;
+        lastStuckCheckX = ex;
+        lastStuckCheckZ = ez;
     }
 
     audioUpdateMonsterVolume(px, pz, ex, ez);

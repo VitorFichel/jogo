@@ -23,6 +23,16 @@ void display() {
     }
   }
 
+  // Alguns segundos depois do jumpscare (contando a partir do início do
+  // susto, mesmo já em LOST), desliga TODOS os sons, incluindo o próprio
+  // jumpscare. Só volta a tocar quando o jogador apertar R (gameReset()).
+  if ((state == JUMPSCARE || state == LOST) && !audioStoppedAfterJumpscare) {
+    if (glutGet(GLUT_ELAPSED_TIME) - jumpscareStartTime > 3000) {
+      audioStopAll();
+      audioStoppedAfterJumpscare = true;
+    }
+  }
+
   audioUpdate();
 
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -112,6 +122,23 @@ void display() {
       const char* unlockMsg = "Saida desbloqueada!";
       for (const char* c = unlockMsg; *c; c++)
         glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+    }
+
+    // Aviso ao encostar na saída sem ter todas as chaves
+    if (showExitLockedWarning) {
+      int elapsed = glutGet(GLUT_ELAPSED_TIME) - exitLockedWarningTime;
+      if (elapsed < 2000) {
+        glColor4f(1.0f, 0.2f, 0.2f, 0.9f);
+        glRasterPos2i(220, 80);
+        char lockMsg[64];
+        int faltam = NUM_KEYS - keysCollected;
+        snprintf(lockMsg, sizeof(lockMsg), "Porta trancada! Faltam %d chave%s",
+                 faltam, faltam == 1 ? "" : "s");
+        for (const char* c = lockMsg; *c; c++)
+          glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, *c);
+      } else {
+        showExitLockedWarning = false;
+      }
     }
 
     // Countdown do delay entre chaves

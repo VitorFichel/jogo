@@ -10,6 +10,10 @@ extern GameState state;
 // Cronômetro para saber quanto tempo o susto deve durar
 extern int jumpscareStartTime; 
 
+// Garante que o desligamento de todos os sons (alguns segundos após o
+// jumpscare) só acontece uma vez por susto; é reativado em gameReset().
+extern bool audioStoppedAfterJumpscare;
+
 void gameReset();
 
 #endif

@@ -21,4 +21,9 @@ void cameraKeyDown(unsigned char key);
 void cameraKeyUp(unsigned char key);
 void cameraUpdate(); 
 
+// Trava a câmera olhando fixo para um ponto do mundo (usado no jumpscare:
+// olha pro rosto do monstro). Ajusta py/yaw/pitch e zera o head-bobbing,
+// pra a câmera não tremer/derivar enquanto o susto acontece.
+void cameraLockOnPoint(float targetX, float targetY, float targetZ);
+
 #endif

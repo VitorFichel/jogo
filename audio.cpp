@@ -24,6 +24,10 @@ static int activeLaugh = -1; // qual risada está tocando (-1 = nenhuma)
 
 static bool isInitialized = false;
 
+// Quando true, audioUpdate() não toca/reinicia nada — usado pra desligar
+// tudo de vez alguns segundos depois do jumpscare, até o jogador apertar R.
+static bool audioMuted = false;
+
 // Toca uma risada aleatória, garantindo que não sobreponha outra
 static void playRandomLaugh() {
     // Se ainda tem uma risada tocando, não interrompe
@@ -78,6 +82,7 @@ ma_sound_set_volume(&chaseSound, 0.8f);
 
 void audioUpdate() {
     if (!isInitialized) return;
+    if (audioMuted) return; // tudo desligado até o próximo gameReset()
 
     if (state == JUMPSCARE) {
         if (!ma_sound_is_playing(&jumpscareSound)) {
@@ -211,4 +216,26 @@ void audioCleanup() {
     ma_sound_uninit(&latinSound);
     ma_sound_uninit(&chaseSound);
     ma_engine_uninit(&engine);
+}
+
+void audioStopAll() {
+    if (!isInitialized) return;
+
+    ma_sound_stop(&ambientSound);
+    ma_sound_stop(&breathSound);
+    ma_sound_stop(&heartSound);
+    ma_sound_stop(&jumpscareSound);
+    ma_sound_stop(&chaseSound);
+    for (int i = 0; i < 4; i++) ma_sound_stop(&laughs[i]);
+    ma_sound_stop(&latinSound);
+
+    audioMuted = true;
+}
+
+void audioRestartAll() {
+    // Não toca nada aqui diretamente: só libera o mudo. audioUpdate()
+    // já cuida de religar o som ambiente (e os demais sons reagem
+    // normalmente às variáveis de estado do jogo, como isChasing e
+    // isExhausted, que o gameReset() também já zera).
+    audioMuted = false;
 }
