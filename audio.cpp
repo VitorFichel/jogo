@@ -61,7 +61,7 @@ void audioInit() {
     ma_sound_init_from_file(&engine, "assets/audio/latin.mp3",  MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &latinSound);
     ma_sound_init_from_file(&engine, "assets/audio/perseguicao.mp3", MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_ASYNC, NULL, NULL, &chaseSound);
 ma_sound_set_looping(&chaseSound, MA_TRUE);
-ma_sound_set_volume(&chaseSound, 0.8f); 
+ma_sound_set_volume(&chaseSound, 0.7f); 
 
     // Todos os sons de susto/risada não fazem loop
     for (int i = 0; i < 4; i++)
