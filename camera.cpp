@@ -173,9 +173,9 @@ void cameraUpdate() {
       nextSequenceCheckTime = now + 200; 
   }
 
-  float baseSpeed = 10.0f;
-  float sprintSpeed = 12.0f; 
-  float exhaustedSpeed = 8.0f; 
+  float baseSpeed = 4.0f;
+  float sprintSpeed = 7.0f; 
+  float exhaustedSpeed = 3.0f; 
   float speed = baseSpeed;
   
   bool isMoving = (keys['w'] || keys['s'] || keys['a'] || keys['d']);

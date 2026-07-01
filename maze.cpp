@@ -58,8 +58,8 @@ struct WallDecal {
 static std::vector<WallDecal> wallDecals;
 // ------------------------------------------------
 
-// ---- AS 4 CHAVES ----
-// NUM_KEYS é definido em maze.h
+// ---- AS 6 CHAVES ----
+// NUM_KEYS é definido em maze.h (precisa estar como 6)
 
 // Posições fixas de cada chave no mundo
 Key keys8[NUM_KEYS] = {
@@ -67,6 +67,8 @@ Key keys8[NUM_KEYS] = {
     { 8.0f,             28.0f,             false },  // 1 – Biblioteca (mesa escritório)
     {16.0f * CELL_SIZE,  3.0f * CELL_SIZE, false },  // 2 – Quarto do fundo
     { 9.0f * CELL_SIZE, 14.0f * CELL_SIZE, false },  // 3 – Sala central
+    {12.0f * CELL_SIZE,  9.0f * CELL_SIZE, false },  // 4 – Corredor longo (ajustar se necessário)
+    {16.0f * CELL_SIZE, 18.0f * CELL_SIZE, false },  // 5 – Sala lateral inferior (ajustar se necessário)
 };
 
 int keysCollected = 0;
@@ -132,16 +134,12 @@ GLuint loadPropOBJ(std::string filename) {
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials(); 
 
-    printf("[Movel] %s carregado com sucesso. Materiais lidos: %d\n", filename.c_str(), (int)materials.size());
-
     for (const auto& mat : materials) {
         if (!mat.diffuse_texname.empty() && loadedPropTextures.find(mat.diffuse_texname) == loadedPropTextures.end()) {
             std::string texPath = basepath + mat.diffuse_texname;
             GLuint texID = loadTexture(texPath.c_str());
             if (texID != 0) {
                 loadedPropTextures[mat.diffuse_texname] = texID;
-            } else {
-                printf("Aviso: Nao foi possivel carregar a imagem de textura: %s\n", texPath.c_str());
             }
         }
     }
@@ -271,7 +269,6 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
     cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
 
     if (result != cgltf_result_success || data == NULL) {
-        printf("Aviso: falha ao abrir/parsear %s (cgltf_result=%d)\n", filepath.c_str(), (int)result);
         if (outAutoScale) *outAutoScale = 1.0f;
         if (outBaseYOffset) *outBaseYOffset = 0.0f;
         return 0;
@@ -279,7 +276,6 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
 
     result = cgltf_load_buffers(&options, data, filepath.c_str());
     if (result != cgltf_result_success) {
-        printf("Aviso: falha ao carregar buffers de %s (cgltf_result=%d)\n", filepath.c_str(), (int)result);
         cgltf_free(data);
         if (outAutoScale) *outAutoScale = 1.0f;
         if (outBaseYOffset) *outBaseYOffset = 0.0f;
@@ -587,28 +583,15 @@ void mazeInit() {
     wallTex = loadTexture("assets/textures/wall.jpg");
     floorTex = loadTexture("assets/textures/floor.jpg");
 
-    // Carrega o modelo único usado para todas as 8 chaves (tenta .glb, depois .obj)
+    // Carrega o modelo único usado para todas as 6 chaves (tenta .glb, depois .obj)
     keyModelList = loadPropGLB("chave.glb", &keyModelAutoScale, &keyModelBaseYOffset);
     if (keyModelList == 0) { keyModelList = loadPropOBJ("chave.obj"); keyModelAutoScale = 1.0f; keyModelBaseYOffset = 0.0f; }
-    if (keyModelList == 0) printf("Aviso: modelo da chave nao encontrado (assets/moveis/chave.glb ou .obj). Usando cubo como fallback.\n");
-    else {
+    if (keyModelList != 0) {
         // loadPropGLB normaliza pra PROP_TARGET_HEIGHT (altura de móvel);
         // reescala pro tamanho compacto de uma chave (~0.3 unidades).
         const float KEY_TARGET_HEIGHT = 0.3f;
         keyModelAutoScale *= (KEY_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
         keyModelBaseYOffset *= (KEY_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
-    }
-
-    doorModelList = loadPropGLB("porta.glb", &doorModelAutoScale, &doorModelBaseYOffset);
-    if (doorModelList == 0) { doorModelList = loadPropOBJ("porta.obj"); doorModelAutoScale = 1.0f; doorModelBaseYOffset = 0.0f; }
-    if (doorModelList == 0) {
-        printf("Aviso: modelo da porta nao encontrado (assets/moveis/porta.glb ou .obj). Usando geometria procedural como fallback.\n");
-    } else {
-        // loadPropGLB normaliza pra PROP_TARGET_HEIGHT (móveis); reescala pra
-        // caber no vão de porta padrão do labirinto (altura ~2.0 unidades).
-        const float DOOR_TARGET_HEIGHT = 2.0f;
-        doorModelAutoScale *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
-        doorModelBaseYOffset *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
     }
 
     buildAABBs();
@@ -727,7 +710,7 @@ void mazeDraw() {
 
     drawWallDecals();
 
-    // ---- DESENHA AS 8 CHAVES ----
+    // ---- DESENHA AS 6 CHAVES ----
     int now = glutGet(GLUT_ELAPSED_TIME);
     for (int i = 0; i < NUM_KEYS; i++) {
         if (!keys8[i].active) continue;
@@ -771,7 +754,7 @@ bool checkCollisionAABB(float px, float pz, float radius) {
 
 // ---- AVISO DE "FALTAM CHAVES" AO TOCAR NA SAÍDA TRANCADA ----
 // main.cpp lê showExitLockedWarning/exitLockedWarningTime pra desenhar um
-// aviso na HUD quando o jogador encostar na porta sem ter as 8 chaves.
+// aviso na HUD quando o jogador encostar na porta sem ter as 6 chaves.
 bool showExitLockedWarning = false;
 int exitLockedWarningTime = 0;
 static const int EXIT_WARNING_COOLDOWN_MS = 2500; // intervalo mínimo entre re-disparos do aviso

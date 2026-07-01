@@ -9,7 +9,7 @@
 #define LAB_H 21
 #define CELL_SIZE 2.0f
 #define WALL_HEIGHT 3.2f 
-#define NUM_KEYS 4
+#define NUM_KEYS 6 
 
 extern int maze[LAB_H][LAB_W];
 

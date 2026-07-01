@@ -105,7 +105,6 @@ static void loadMonsterFrames() {
         
         glEndList();
     }
-    printf("Animacao do monstro carregada com texturas originais!\n");
 }
 
 float ex, ez;
