@@ -1,6 +1,7 @@
 #include "maze.h"
 #include <GL/glut.h>
 #include <cmath>
+#include <algorithm>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -41,6 +42,21 @@ int maze[LAB_H][LAB_W] = {
 std::vector<AABB> worldAABBs;
 GLuint wallTex = 0;
 GLuint floorTex = 0;
+
+// ---- DECALS DE SUJEIRA/SANGUE NAS PAREDES ----
+#define NUM_DECAL_TEXTURES 3
+static GLuint decalTextures[NUM_DECAL_TEXTURES] = {0, 0, 0};
+
+struct WallDecal {
+    float x, y, z;       // posição central do decal no mundo
+    float nx, ny, nz;    // normal da face onde está colado
+    float size;          // tamanho (largura/altura) do decal
+    float rot;           // rotação aleatória em torno da normal (variedade visual)
+    int texIndex;        // qual textura de decal usar
+    float r, g, b;       // tingimento leve pra variar entre manchas (evita repetição óbvia)
+};
+static std::vector<WallDecal> wallDecals;
+// ------------------------------------------------
 
 // ---- AS 4 CHAVES ----
 // NUM_KEYS é definido em maze.h
@@ -432,6 +448,141 @@ void buildAABBs() {
     }
 }
 
+// Gera manchas aleatórias coladas nas paredes (type == 1).
+// Roda uma vez no mazeInit(); usa uma seed fixa pra layout não mudar a cada
+// gameReset() (fica sempre nos mesmos lugares, como parte do level design).
+static void generateWallDecals() {
+    wallDecals.clear();
+    unsigned int savedSeed = rand(); // não bagunça a sequência de rand() usada pelo resto do jogo
+    srand(12345);
+
+    // Margem mínima nas bordas do segmento pra mancha nunca "vazar" pra fora
+    // da parede real (ela é desenhada como um quad plano; se for maior que o
+    // trecho disponível, sobra por cima do vão ao lado e parece flutuar).
+    const float EDGE_MARGIN = 0.15f;
+    const float MIN_WALL_LENGTH = 0.5f; // segmentos menores que isso não recebem decal
+
+    for (const auto& box : worldAABBs) {
+        if (box.type != 1) continue; // só paredes normais
+
+        float w = box.maxX - box.minX;
+        float d = box.maxZ - box.minZ;
+
+        // Decide, sem ambiguidade, qual é a dimensão "longa" (o comprimento
+        // visível do trecho de parede) e qual é a "curta" (espessura, ~0.3).
+        // useZFace = true significa: a parede é comprida no eixo X, então as
+        // faces que valem a pena receber decal são as voltadas para +Z/-Z.
+        bool useZFace = (w >= d);
+        float wallLength = useZFace ? w : d; // comprimento disponível pro decal deslizar
+        if (wallLength < MIN_WALL_LENGTH) continue; // segmento curto demais (canto/junção) -- pula
+
+        // Chance de cada segmento de parede ganhar 0, 1 ou 2 manchas
+        int numDecals = (rand() % 100 < 35) ? 1 + (rand() % 2) : 0;
+
+        for (int n = 0; n < numDecals; n++) {
+            WallDecal dec;
+
+            // O tamanho da mancha nunca pode passar do espaço disponível
+            // entre as margens, senão ela "vaza" pelas pontas do segmento.
+            float maxSize = wallLength - 2.0f * EDGE_MARGIN;
+            if (maxSize < 0.3f) maxSize = 0.3f; // segmento estreito: mancha pequena mesmo
+            float sizeCap = std::min(1.6f, maxSize);
+            float minSize = std::min(0.6f, sizeCap * 0.6f);
+            dec.size = minSize + (rand() % 100) / 100.0f * (sizeCap - minSize);
+
+            dec.rot = (float)(rand() % 360);
+            dec.texIndex = rand() % NUM_DECAL_TEXTURES;
+
+            // Leve variação de tom pra mesma textura não parecer "carimbada"
+            float shade = 0.75f + (rand() % 100) / 100.0f * 0.5f; // 0.75 a 1.25
+            dec.r = dec.g = dec.b = shade;
+
+            float yPos = 0.4f + (rand() % 100) / 100.0f * (WALL_HEIGHT - 1.2f);
+
+            // Posição ao longo do comprimento, sempre dentro das margens
+            // (garante metade do tamanho da mancha + margem livre nas pontas)
+            float halfSize = dec.size / 2.0f;
+            float usableStart = EDGE_MARGIN + halfSize;
+            float usableEnd = wallLength - EDGE_MARGIN - halfSize;
+            float posAlong;
+            if (usableEnd <= usableStart) {
+                posAlong = wallLength / 2.0f; // segmento apertado: centraliza
+            } else {
+                posAlong = usableStart + (rand() % 100) / 100.0f * (usableEnd - usableStart);
+            }
+
+            if (useZFace) {
+                float xPos = box.minX + posAlong;
+                if (rand() % 2 == 0) {
+                    dec.x = xPos; dec.z = box.maxZ + 0.01f; dec.nx = 0; dec.nz = 1;
+                } else {
+                    dec.x = xPos; dec.z = box.minZ - 0.01f; dec.nx = 0; dec.nz = -1;
+                }
+            } else {
+                float zPos = box.minZ + posAlong;
+                if (rand() % 2 == 0) {
+                    dec.x = box.maxX + 0.01f; dec.z = zPos; dec.nx = 1; dec.nz = 0;
+                } else {
+                    dec.x = box.minX - 0.01f; dec.z = zPos; dec.nx = -1; dec.nz = 0;
+                }
+            }
+            dec.y = yPos;
+            dec.ny = 0;
+
+            wallDecals.push_back(dec);
+        }
+    }
+
+    srand(savedSeed); // devolve a sequência de rand() ao estado anterior
+}
+
+// Desenha as manchas por cima das paredes já desenhadas. Usa blend com o
+// z-buffer só em leitura (glDepthMask(GL_FALSE)) pra "colar" na parede sem
+// competir com ela por profundidade (evita flicker/z-fighting).
+static void drawWallDecals() {
+    if (wallDecals.empty()) return;
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_ALPHA_TEST);
+    glAlphaFunc(GL_GREATER, 0.1f); // descarta pixels quase transparentes (evita "quadrado" visível de fundo)
+    glDepthMask(GL_FALSE);
+    glEnable(GL_TEXTURE_2D);
+
+    for (const auto& dec : wallDecals) {
+        if (decalTextures[dec.texIndex] == 0) continue;
+        glBindTexture(GL_TEXTURE_2D, decalTextures[dec.texIndex]);
+        glColor4f(dec.r, dec.g, dec.b, 1.0f);
+
+        glPushMatrix();
+        glTranslatef(dec.x, dec.y, dec.z);
+
+        // Orienta o quad pra "colar" na face certa da parede
+        if (fabs(dec.nz) > 0.5f) {
+            glRotatef(dec.nz > 0 ? 0.0f : 180.0f, 0, 1, 0);
+        } else {
+            glRotatef(dec.nx > 0 ? 90.0f : -90.0f, 0, 1, 0);
+        }
+        glRotatef(dec.rot, 0, 0, 1); // gira a mancha no próprio plano p/ variedade
+
+        float h = dec.size;
+        glBegin(GL_QUADS);
+            glNormal3f(dec.nx, dec.ny, dec.nz);
+            glTexCoord2f(0.0f, 0.0f); glVertex3f(-h/2, -h/2, 0.0f);
+            glTexCoord2f(1.0f, 0.0f); glVertex3f( h/2, -h/2, 0.0f);
+            glTexCoord2f(1.0f, 1.0f); glVertex3f( h/2,  h/2, 0.0f);
+            glTexCoord2f(0.0f, 1.0f); glVertex3f(-h/2,  h/2, 0.0f);
+        glEnd();
+
+        glPopMatrix();
+    }
+
+    glColor3f(1.0f, 1.0f, 1.0f);
+    glDepthMask(GL_TRUE);
+    glDisable(GL_ALPHA_TEST);
+    glDisable(GL_BLEND);
+}
+
 void mazeInit() {
     wallTex = loadTexture("assets/textures/wall.jpg");
     floorTex = loadTexture("assets/textures/floor.jpg");
@@ -461,6 +612,13 @@ void mazeInit() {
     }
 
     buildAABBs();
+
+    // ---- DECALS DE PAREDE (manchas de sangue/sujeira) ----
+    decalTextures[0] = loadTexture("assets/textures/decal_blood1.png");
+    decalTextures[1] = loadTexture("assets/textures/decal_dirt1.png");
+    decalTextures[2] = loadTexture("assets/textures/decal_dirt2.png");
+    generateWallDecals();
+    // --------------------------------------------------------
 
     // Reseta e embaralha a ordem das chaves
     keysCollected = 0;
@@ -566,6 +724,8 @@ void mazeDraw() {
         else if (box.type == 6) { glColor3f(0.3f, 0.15f, 0.05f); drawAABB(box, 2.0f); }
     }
     glDisable(GL_TEXTURE_2D);
+
+    drawWallDecals();
 
     // ---- DESENHA AS 8 CHAVES ----
     int now = glutGet(GLUT_ELAPSED_TIME);

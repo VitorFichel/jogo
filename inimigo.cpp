@@ -70,7 +70,8 @@ static void loadMonsterFrames() {
                     tinyobj::index_t idx = shapes[s].mesh.indices[index_offset + v];
 
                     // Lê o reflexo da luz
-                    if (idx.normal_index >= 0) {
+                    if (idx.normal_index >= 0 &&
+                        3 * size_t(idx.normal_index) + 2 < attrib.normals.size()) {
                         tinyobj::real_t nx = attrib.normals[3 * size_t(idx.normal_index) + 0];
                         tinyobj::real_t ny = attrib.normals[3 * size_t(idx.normal_index) + 1];
                         tinyobj::real_t nz = attrib.normals[3 * size_t(idx.normal_index) + 2];
@@ -78,17 +79,21 @@ static void loadMonsterFrames() {
                     }
                     
                     // LÊ AS COORDENADAS DA IMAGEM (UV)
-                    if (idx.texcoord_index >= 0) {
+                    if (idx.texcoord_index >= 0 &&
+                        2 * size_t(idx.texcoord_index) + 1 < attrib.texcoords.size()) {
                         tinyobj::real_t tx = attrib.texcoords[2 * size_t(idx.texcoord_index) + 0];
                         tinyobj::real_t ty = attrib.texcoords[2 * size_t(idx.texcoord_index) + 1];
                         glTexCoord2f(tx, 1.0f - ty);
                     }
                     
                     // Lê a posição do modelo
-                    tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
-                    tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
-                    tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
-                    glVertex3f(vx, vy, vz);
+                    if (idx.vertex_index >= 0 &&
+                        3 * size_t(idx.vertex_index) + 2 < attrib.vertices.size()) {
+                        tinyobj::real_t vx = attrib.vertices[3 * size_t(idx.vertex_index) + 0];
+                        tinyobj::real_t vy = attrib.vertices[3 * size_t(idx.vertex_index) + 1];
+                        tinyobj::real_t vz = attrib.vertices[3 * size_t(idx.vertex_index) + 2];
+                        glVertex3f(vx, vy, vz);
+                    }
                 }
                 glEnd();
                 index_offset += fv;
@@ -236,6 +241,12 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, in
     int row = goalRow, col = goalCol;
     while (cameFrom[row][col] != std::make_pair(startRow, startCol)) {
         auto prev = cameFrom[row][col];
+        // Guarda de segurança: se por algum motivo o caminho de volta cair
+        // numa célula sem "pai" registrado (não deveria acontecer, mas
+        // evita ler cameFrom[-1][-1] e travar o jogo), aborta com segurança.
+        if (prev.first < 0 || prev.first >= LAB_H || prev.second < 0 || prev.second >= LAB_W) {
+            return false;
+        }
         row = prev.first;
         col = prev.second;
     }
