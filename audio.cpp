@@ -74,7 +74,7 @@ ma_sound_set_volume(&chaseSound, 0.8f);
     ma_sound_set_volume(&heartSound, 1.4f); 
 
     ma_sound_set_looping(&ambientSound, MA_TRUE);
-    ma_sound_set_volume(&ambientSound, 0.3f); 
+    ma_sound_set_volume(&ambientSound, 0.4f); 
     ma_sound_start(&ambientSound);
 
     isInitialized = true;

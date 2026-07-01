@@ -253,8 +253,22 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
     cgltf_options options = {};
     cgltf_data* data = NULL;
     cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
-    
-    cgltf_load_buffers(&options, data, filepath.c_str());
+
+    if (result != cgltf_result_success || data == NULL) {
+        printf("Aviso: falha ao abrir/parsear %s (cgltf_result=%d)\n", filepath.c_str(), (int)result);
+        if (outAutoScale) *outAutoScale = 1.0f;
+        if (outBaseYOffset) *outBaseYOffset = 0.0f;
+        return 0;
+    }
+
+    result = cgltf_load_buffers(&options, data, filepath.c_str());
+    if (result != cgltf_result_success) {
+        printf("Aviso: falha ao carregar buffers de %s (cgltf_result=%d)\n", filepath.c_str(), (int)result);
+        cgltf_free(data);
+        if (outAutoScale) *outAutoScale = 1.0f;
+        if (outBaseYOffset) *outBaseYOffset = 0.0f;
+        return 0;
+    }
 
     // ---- Mede o bounding box real do modelo (em unidades originais do arquivo) ----
     float bbMin[3], bbMax[3];
@@ -285,7 +299,7 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
                 cgltf_texture_view* texView = &primitive->material->pbr_metallic_roughness.base_color_texture;
                 if (texView->texture && texView->texture->image) {
                     cgltf_image* image = texView->texture->image;
-                    if (image->buffer_view) {
+                    if (image->buffer_view && image->buffer_view->buffer && image->buffer_view->buffer->data) {
                         unsigned char* img_bytes = (unsigned char*)image->buffer_view->buffer->data + image->buffer_view->offset;
                         int w, h, channels;
                         unsigned char* pixels = stbi_load_from_memory(img_bytes, image->buffer_view->size, &w, &h, &channels, 4);
