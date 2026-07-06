@@ -23,9 +23,7 @@ void display() {
     }
   }
 
-  // Alguns segundos depois do jumpscare (contando a partir do início do
-  // susto, mesmo já em LOST), desliga TODOS os sons, incluindo o próprio
-  // jumpscare. Só volta a tocar quando o jogador apertar R (gameReset()).
+
   if ((state == JUMPSCARE || state == LOST) && !audioStoppedAfterJumpscare) {
     if (glutGet(GLUT_ELAPSED_TIME) - jumpscareStartTime > 3000) {
       audioStopAll();
@@ -79,14 +77,13 @@ void display() {
     glEnd();
 
     // ---- HUD DAS CHAVES ----
-    // Fundo semitransparente
     glColor4f(0.0f, 0.0f, 0.0f, 0.5f);
     glBegin(GL_QUADS);
     glVertex2f(10, 570); glVertex2f(160, 570);
     glVertex2f(160, 590); glVertex2f(10, 590);
     glEnd();
 
-    // Texto "Chaves: X/8"
+    // Texto "Chaves: X/6"
     if (keysCollected >= NUM_KEYS)
       glColor4f(0.0f, 1.0f, 0.3f, 1.0f); // verde quando completo
     else
@@ -98,14 +95,14 @@ void display() {
     for (const char* c = keyMsg; *c; c++)
       glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
 
-    // Ícones das chaves (quadradinhos dourados/cinzas)
+    // Ícones das chaves
     for (int i = 0; i < NUM_KEYS; i++) {
       float kx = 15.0f + i * 18.0f;
       float ky = 555.0f;
       if (i < keysCollected)
-        glColor4f(1.0f, 0.8f, 0.0f, 1.0f); // coletada: dourado
+        glColor4f(1.0f, 0.8f, 0.0f, 1.0f);
       else
-        glColor4f(0.3f, 0.3f, 0.3f, 0.7f); // pendente: cinza
+        glColor4f(0.3f, 0.3f, 0.3f, 0.7f);
 
       glBegin(GL_QUADS);
       glVertex2f(kx,      ky);

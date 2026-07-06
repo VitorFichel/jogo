@@ -13,7 +13,7 @@
 #include "cgltf.h"
 
 
-// A sua nova matriz baseada na planta arquitetônica
+// 1. A matriz maze[LAB_H][LAB_W]
 int maze[LAB_H][LAB_W] = {
     // 0  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20
     {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1}, // 0
@@ -56,21 +56,17 @@ struct WallDecal {
     float r, g, b;       // tingimento leve pra variar entre manchas (evita repetição óbvia)
 };
 static std::vector<WallDecal> wallDecals;
-// ------------------------------------------------
-
-// ---- AS 6 CHAVES ----
-// NUM_KEYS é definido em maze.h (precisa estar como 6)
 
 // Posições fixas de cada chave no mundo
 Key keys8[NUM_KEYS] = {
-    { 5.2f * CELL_SIZE,  1.2f * CELL_SIZE, false },  // 0 – Quarto inicial
-    { 8.0f,             28.0f,             false },  // 1 – Biblioteca (mesa escritório)
+    { 5.0f * CELL_SIZE,  1.0f * CELL_SIZE, false },  // 0 – Quarto inicial
+    { 19.0f * CELL_SIZE, 19.0f * CELL_SIZE, false },  // 1 – Biblioteca (mesa escritório)
     {16.0f * CELL_SIZE,  3.0f * CELL_SIZE, false },  // 2 – Quarto do fundo
     { 9.0f * CELL_SIZE, 14.0f * CELL_SIZE, false },  // 3 – Sala central
-    {12.0f * CELL_SIZE,  9.0f * CELL_SIZE, false },  // 4 – Corredor longo (ajustar se necessário)
-    {16.0f * CELL_SIZE, 18.0f * CELL_SIZE, false },  // 5 – Sala lateral inferior (ajustar se necessário)
+    {12.0f * CELL_SIZE,  8.0f * CELL_SIZE, false },  // 4 – Corredor lateral
+    { 3.0f * CELL_SIZE, 17.0f * CELL_SIZE, false },  // 5 – Sala dos fundos
 };
-
+//4. Variáveis do sistema de chaves
 int keysCollected = 0;
 GLuint keyModelList = 0;
 GLuint doorModelList = 0;
@@ -85,7 +81,7 @@ int currentKeyIndex = 0;      // qual slot de keyOrder está ativo agora
 int nextKeyTime    = 0;       // timestamp (ms) em que a próxima chave aparece
 bool waitingDelay  = false;   // true durante o delay de 10s
 
-// Embaralha keyOrder com Fisher-Yates e ativa a primeira chave
+// 7. Embaralha keyOrder com Fisher-Yates e ativa a primeira chave
 static void shuffleAndStart() {
     for (int i = 0; i < NUM_KEYS; i++) keyOrder[i] = i;
     for (int i = NUM_KEYS - 1; i > 0; i--) {
@@ -98,7 +94,7 @@ static void shuffleAndStart() {
     // Ativa a primeira chave da ordem
     keys8[keyOrder[0]].active = true;
 }
-
+// 6. loadTexture()
 GLuint loadTexture(const char* filename) {
     int width, height, channels;
     unsigned char* data = stbi_load(filename, &width, &height, &channels, 4);
@@ -116,7 +112,8 @@ GLuint loadTexture(const char* filename) {
 
 static std::map<std::string, GLuint> loadedPropTextures;
 
-// Carregador avançado de OBJ para os móveis (Com suporte a Cores MTL, UVs, Texturas e Correção de Estado)
+// 7. Carregador avançado de OBJ dos antigos moveis
+
 GLuint loadPropOBJ(std::string filename) {
     std::string basepath = "assets/moveis/"; 
     std::string filepath = basepath + filename;
@@ -134,12 +131,16 @@ GLuint loadPropOBJ(std::string filename) {
     auto& shapes = reader.GetShapes();
     auto& materials = reader.GetMaterials(); 
 
+    printf("[Movel] %s carregado com sucesso. Materiais lidos: %d\n", filename.c_str(), (int)materials.size());
+
     for (const auto& mat : materials) {
         if (!mat.diffuse_texname.empty() && loadedPropTextures.find(mat.diffuse_texname) == loadedPropTextures.end()) {
             std::string texPath = basepath + mat.diffuse_texname;
             GLuint texID = loadTexture(texPath.c_str());
             if (texID != 0) {
                 loadedPropTextures[mat.diffuse_texname] = texID;
+            } else {
+                printf("Aviso: Nao foi possivel carregar a imagem de textura: %s\n", texPath.c_str());
             }
         }
     }
@@ -214,9 +215,7 @@ GLuint loadPropOBJ(std::string filename) {
     return list;
 }
 
-// ---- NOVO CARREGADOR .GLB (Texturas Embutidas e Geometria) ----
-// Calcula o bounding box (min/max) de todos os vértices de posição do GLB.
-// Usado para descobrir o tamanho real do modelo antes de desenhá-lo.
+// 8. .GLB (Texturas Embutidas e Geometria)
 static void computeGLBBounds(cgltf_data* data, float outMin[3], float outMax[3]) {
     bool any = false;
     outMin[0] = outMin[1] = outMin[2] =  1e30f;
@@ -252,15 +251,8 @@ static void computeGLBBounds(cgltf_data* data, float outMin[3], float outMax[3])
     }
 }
 
-// Tamanho-alvo padrão (em unidades do mundo) para o lado mais alto de qualquer
-// móvel .glb carregado. Todo asset que você subir é automaticamente escalado
-// para essa altura, mantendo as proporções originais.
 static const float PROP_TARGET_HEIGHT = 1.4f;
-
-// Carrega um .glb e devolve, além da display list, a escala automática
-// calculada (outAutoScale) e o quanto descer/subir o modelo no eixo Y
-// (outBaseYOffset) para que a base dele fique exatamente em y = 0 (no chão),
-// já considerando essa escala.
+// 9. loadPropGLB() 
 GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOffset) {
     std::string filepath = "assets/moveis/" + filename;
     
@@ -269,6 +261,7 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
     cgltf_result result = cgltf_parse_file(&options, filepath.c_str(), &data);
 
     if (result != cgltf_result_success || data == NULL) {
+        printf("Aviso: falha ao abrir/parsear %s (cgltf_result=%d)\n", filepath.c_str(), (int)result);
         if (outAutoScale) *outAutoScale = 1.0f;
         if (outBaseYOffset) *outBaseYOffset = 0.0f;
         return 0;
@@ -276,13 +269,13 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
 
     result = cgltf_load_buffers(&options, data, filepath.c_str());
     if (result != cgltf_result_success) {
+        printf("Aviso: falha ao carregar buffers de %s (cgltf_result=%d)\n", filepath.c_str(), (int)result);
         cgltf_free(data);
         if (outAutoScale) *outAutoScale = 1.0f;
         if (outBaseYOffset) *outBaseYOffset = 0.0f;
         return 0;
     }
 
-    // ---- Mede o bounding box real do modelo (em unidades originais do arquivo) ----
     float bbMin[3], bbMax[3];
     computeGLBBounds(data, bbMin, bbMax);
     float sizeX = bbMax[0] - bbMin[0];
@@ -375,7 +368,7 @@ GLuint loadPropGLB(std::string filename, float* outAutoScale, float* outBaseYOff
     cgltf_free(data);
     return list;
 }
-
+// 10. buildAABBs() — traduzindo a tabela em geometria
 void buildAABBs() {
     worldAABBs.clear();
     float WT = 0.15f; 
@@ -445,18 +438,14 @@ void buildAABBs() {
 }
 
 // Gera manchas aleatórias coladas nas paredes (type == 1).
-// Roda uma vez no mazeInit(); usa uma seed fixa pra layout não mudar a cada
-// gameReset() (fica sempre nos mesmos lugares, como parte do level design).
 static void generateWallDecals() {
     wallDecals.clear();
-    unsigned int savedSeed = rand(); // não bagunça a sequência de rand() usada pelo resto do jogo
+    unsigned int savedSeed = rand(); 
     srand(12345);
 
-    // Margem mínima nas bordas do segmento pra mancha nunca "vazar" pra fora
-    // da parede real (ela é desenhada como um quad plano; se for maior que o
-    // trecho disponível, sobra por cima do vão ao lado e parece flutuar).
+    // Margem mínima nas bordas do segmento pra mancha nunca "vazar" pra fora.
     const float EDGE_MARGIN = 0.15f;
-    const float MIN_WALL_LENGTH = 0.5f; // segmentos menores que isso não recebem decal
+    const float MIN_WALL_LENGTH = 0.5f; 
 
     for (const auto& box : worldAABBs) {
         if (box.type != 1) continue; // só paredes normais
@@ -464,13 +453,9 @@ static void generateWallDecals() {
         float w = box.maxX - box.minX;
         float d = box.maxZ - box.minZ;
 
-        // Decide, sem ambiguidade, qual é a dimensão "longa" (o comprimento
-        // visível do trecho de parede) e qual é a "curta" (espessura, ~0.3).
-        // useZFace = true significa: a parede é comprida no eixo X, então as
-        // faces que valem a pena receber decal são as voltadas para +Z/-Z.
         bool useZFace = (w >= d);
-        float wallLength = useZFace ? w : d; // comprimento disponível pro decal deslizar
-        if (wallLength < MIN_WALL_LENGTH) continue; // segmento curto demais (canto/junção) -- pula
+        float wallLength = useZFace ? w : d; 
+        if (wallLength < MIN_WALL_LENGTH) continue; 
 
         // Chance de cada segmento de parede ganhar 0, 1 ou 2 manchas
         int numDecals = (rand() % 100 < 35) ? 1 + (rand() % 2) : 0;
@@ -479,7 +464,6 @@ static void generateWallDecals() {
             WallDecal dec;
 
             // O tamanho da mancha nunca pode passar do espaço disponível
-            // entre as margens, senão ela "vaza" pelas pontas do segmento.
             float maxSize = wallLength - 2.0f * EDGE_MARGIN;
             if (maxSize < 0.3f) maxSize = 0.3f; // segmento estreito: mancha pequena mesmo
             float sizeCap = std::min(1.6f, maxSize);
@@ -495,8 +479,6 @@ static void generateWallDecals() {
 
             float yPos = 0.4f + (rand() % 100) / 100.0f * (WALL_HEIGHT - 1.2f);
 
-            // Posição ao longo do comprimento, sempre dentro das margens
-            // (garante metade do tamanho da mancha + margem livre nas pontas)
             float halfSize = dec.size / 2.0f;
             float usableStart = EDGE_MARGIN + halfSize;
             float usableEnd = wallLength - EDGE_MARGIN - halfSize;
@@ -533,8 +515,6 @@ static void generateWallDecals() {
 }
 
 // Desenha as manchas por cima das paredes já desenhadas. Usa blend com o
-// z-buffer só em leitura (glDepthMask(GL_FALSE)) pra "colar" na parede sem
-// competir com ela por profundidade (evita flicker/z-fighting).
 static void drawWallDecals() {
     if (wallDecals.empty()) return;
 
@@ -583,15 +563,25 @@ void mazeInit() {
     wallTex = loadTexture("assets/textures/wall.jpg");
     floorTex = loadTexture("assets/textures/floor.jpg");
 
-    // Carrega o modelo único usado para todas as 6 chaves (tenta .glb, depois .obj)
+    // Carrega o modelo único usado para todas as 8 chaves (tenta .glb, depois .obj)
     keyModelList = loadPropGLB("chave.glb", &keyModelAutoScale, &keyModelBaseYOffset);
     if (keyModelList == 0) { keyModelList = loadPropOBJ("chave.obj"); keyModelAutoScale = 1.0f; keyModelBaseYOffset = 0.0f; }
-    if (keyModelList != 0) {
-        // loadPropGLB normaliza pra PROP_TARGET_HEIGHT (altura de móvel);
-        // reescala pro tamanho compacto de uma chave (~0.3 unidades).
+    if (keyModelList == 0) printf("Aviso: modelo da chave nao encontrado (assets/moveis/chave.glb ou .obj). Usando cubo como fallback.\n");
+    else {
+        
         const float KEY_TARGET_HEIGHT = 0.3f;
         keyModelAutoScale *= (KEY_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
         keyModelBaseYOffset *= (KEY_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
+    }
+
+    doorModelList = loadPropGLB("porta.glb", &doorModelAutoScale, &doorModelBaseYOffset);
+    if (doorModelList == 0) { doorModelList = loadPropOBJ("porta.obj"); doorModelAutoScale = 1.0f; doorModelBaseYOffset = 0.0f; }
+    if (doorModelList == 0) {
+        printf("Aviso: modelo da porta nao encontrado (assets/moveis/porta.glb ou .obj). Usando geometria procedural como fallback.\n");
+    } else {
+        const float DOOR_TARGET_HEIGHT = 2.0f;
+        doorModelAutoScale *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
+        doorModelBaseYOffset *= (DOOR_TARGET_HEIGHT / PROP_TARGET_HEIGHT);
     }
 
     buildAABBs();
@@ -710,7 +700,7 @@ void mazeDraw() {
 
     drawWallDecals();
 
-    // ---- DESENHA AS 6 CHAVES ----
+    // ---- DESENHA AS 8 CHAVES ----
     int now = glutGet(GLUT_ELAPSED_TIME);
     for (int i = 0; i < NUM_KEYS; i++) {
         if (!keys8[i].active) continue;
@@ -752,16 +742,13 @@ bool checkCollisionAABB(float px, float pz, float radius) {
     return false;
 }
 
-// ---- AVISO DE "FALTAM CHAVES" AO TOCAR NA SAÍDA TRANCADA ----
-// main.cpp lê showExitLockedWarning/exitLockedWarningTime pra desenhar um
-// aviso na HUD quando o jogador encostar na porta sem ter as 6 chaves.
+
 bool showExitLockedWarning = false;
 int exitLockedWarningTime = 0;
 static const int EXIT_WARNING_COOLDOWN_MS = 2500; // intervalo mínimo entre re-disparos do aviso
 
 bool checkExitAABB(float px, float pz) {
-    // Margem de "toque" um pouco maior que o vão real da porta, pra detectar
-    // o jogador encostando mesmo que a colisão física já o pare um pouco antes.
+
     const float touchMargin = 0.6f;
 
     for (const auto& box : worldAABBs) {

@@ -10,15 +10,12 @@
 #include "tiny_obj_loader.h"
 #include "audio.h"
 
-// ---- CONFIGURAÇÕES DO MODELO 3D ----
+// 1. CONFIGURAÇÕES DO MODELO 3D
 static const float MODEL_SCALE = 1.0f;       
 static const float MODEL_Y_OFFSET = 0.0f;     
 static const float MODEL_ROTATION_OFFSET = 0.0f; 
 static const float MODEL_ROTATION_X = 0.0f;
 
-// Altura aproximada (eixo Y) do rosto do monstro, em unidades de mundo,
-// usada pra travar a câmera nele durante o jumpscare. Se o modelo do
-// monstro for maior/menor que um humano padrão, ajuste esse valor.
 static const float MONSTER_FACE_HEIGHT = 8.8f;
 
 // ---- SISTEMA DE ANIMAÇÃO DO INIMIGO (CORES MTL) ----
@@ -126,20 +123,17 @@ static int lastUpdateTime = 0;
 static float targetX, targetZ;
 static bool hasTarget = false;
 
-// ---- DETECÇÃO SIMPLES DE "PRESO" ----
-// Se o inimigo não mudar de posição (de fato) por alguns segundos,
-// força um retraçado de rota. Roda de forma independente do movimento
-// por frame, então não interfere na lógica de slide/colisão normal.
+// DETECÇÃO SIMPLES DE "PRESO" 
 static float lastStuckCheckX = 0.0f, lastStuckCheckZ = 0.0f;
 static int lastStuckCheckTime = 0;
-static const int STUCK_CHECK_SECONDS_MS = 3000; // poucos segundos
-static const float STUCK_MIN_DISTANCE = 0.3f;   // precisa ter andado isso no período, senão está "preso"
+static const int STUCK_CHECK_SECONDS_MS = 3000;
+static const float STUCK_MIN_DISTANCE = 0.3f;  
 
 // Direção que o inimigo está "olhando" (baseada no movimento, não no player)
 static float facingDirX = 0.0f, facingDirZ = 1.0f;
-// ----------------------------------
 
-// ---- SISTEMA DE VISÃO (RAYCASTING) ----
+
+// 4. SISTEMA DE VISÃO (RAYCASTING)
 bool checkLineOfSight(float x1, float z1, float x2, float z2) {
     float dx = x2 - x1;
     float dz = z2 - z1;
@@ -170,7 +164,7 @@ bool checkLineOfSight(float x1, float z1, float x2, float z2) {
     return true; 
 }
 
-// ---- INTELIGÊNCIA DE RONDAR ----
+// 5. INTELIGÊNCIA DE RONDAR
 void pickPatrolPoint() {
     int targetC = (int)(ex / CELL_SIZE);
     int targetR = (int)(ez / CELL_SIZE);
@@ -200,7 +194,7 @@ void enemyInit() {
     pickPatrolPoint(); 
     loadMonsterFrames(); // <--- CHAMA O CARREGADOR DE ANIMAÇÃO
 }
-
+// 6. pathfinding
 static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, int &outRow, int &outCol) {
     if (startRow < 0 || startRow >= LAB_H || startCol < 0 || startCol >= LAB_W || goalRow < 0 || goalRow >= LAB_H || goalCol < 0 || goalCol >= LAB_W) return false;
     if (startRow == goalRow && startCol == goalCol) return false;
@@ -240,9 +234,6 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, in
     int row = goalRow, col = goalCol;
     while (cameFrom[row][col] != std::make_pair(startRow, startCol)) {
         auto prev = cameFrom[row][col];
-        // Guarda de segurança: se por algum motivo o caminho de volta cair
-        // numa célula sem "pai" registrado (não deveria acontecer, mas
-        // evita ler cameFrom[-1][-1] e travar o jogo), aborta com segurança.
         if (prev.first < 0 || prev.first >= LAB_H || prev.second < 0 || prev.second >= LAB_W) {
             return false;
         }
@@ -255,9 +246,7 @@ static bool bfsNextStep(int startRow, int startCol, int goalRow, int goalCol, in
     return true;
 }
 
-// Garante que (row, col) caia numa célula livre, procurando a célula
-// transitável mais próxima caso o ponto informado esteja em cima de
-// uma parede (ex.: jogador encostado/"dentro" da espessura da parede).
+
 static bool findNearestFreeCell(int row, int col, int &outRow, int &outCol) {
     if (row < 0 || row >= LAB_H || col < 0 || col >= LAB_W) return false;
 
@@ -334,18 +323,12 @@ void enemyUpdate() {
         ex = px + cos(approachYaw) * 0.3f;
         ez = pz + sin(approachYaw) * 0.3f;
 
-        // Trava a câmera olhando fixo pro rosto do monstro (sem mais
-        // responder ao mouse nem ao head-bob enquanto durar o susto).
         cameraLockOnPoint(ex, MONSTER_FACE_HEIGHT, ez);
-
-        // O som do jumpscare é disparado automaticamente por audioUpdate()
-        // assim que ele detecta state == JUMPSCARE — não precisa chamar
-        // nada de áudio aqui.
 
         isChasing = false;
         return; 
     }
-
+    //Maquina de estados
     bool canSeePlayer = checkLineOfSight(ex, ez, px, pz);
 
     if (aiState == PATROL) {
@@ -380,9 +363,6 @@ void enemyUpdate() {
         if (!hasTarget) {
             aiState = PATROL;
             pickPatrolPoint();
-            // Recalcula na hora, sem esperar o próximo ciclo de 300ms,
-            // para o inimigo não ficar "congelado" por causa de um
-            // destino inválido (ex.: jogador encostado numa parede).
             recalcPathTo(patrolDestX, patrolDestZ);
         }
     }
@@ -410,8 +390,6 @@ void enemyUpdate() {
         if (!checkCollisionAABB(newEx, ez, ENEMY_RADIUS)) { ex = newEx; movedX = true; }
         if (!checkCollisionAABB(ex, newEz, ENEMY_RADIUS)) { ez = newEz; movedZ = true; }
 
-        // Atualiza a direção visual com o deslocamento que de fato aconteceu
-        // (evita "olhar" pra dentro de uma parede quando só um eixo deslizou)
         float facedX = movedX ? moveX : 0.0f;
         float facedZ = movedZ ? moveZ : 0.0f;
         float facedLen = sqrt(facedX * facedX + facedZ * facedZ);
@@ -424,12 +402,7 @@ void enemyUpdate() {
         ez = targetZ;
     }
 
-    // ---- CHECAGEM SIMPLES DE "PRESO" ----
-    // Roda independente do movimento acima: se o inimigo não andou pelo
-    // menos STUCK_MIN_DISTANCE nos últimos STUCK_CHECK_SECONDS_MS, força um
-    // retraçado de rota. Como roda em intervalo fixo e não depende de eixo
-    // específico, qualquer tipo de travamento (total ou deslizando contra
-    // uma quina) acaba sendo destravado quando o tempo se esgota.
+
     if (lastStuckCheckTime == 0) {
         lastStuckCheckTime = now;
         lastStuckCheckX = ex;

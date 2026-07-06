@@ -12,14 +12,13 @@ float pitch = 0.0f;
 float stamina = 100.0f;
 bool isExhausted = false;
 
-// ---- VARIÁVEIS DE HEAD BOBBING ----
+// VARIÁVEIS DE HEAD BOBBING
 static float bobPhase = 0.0f;
 static float bobOffsetY = 0.0f; 
 static float bobOffsetX = 0.0f; 
-// -----------------------------------
 
-// ---- VARIÁVEIS DA LANTERNA ----
-float flashlightIntensity = 0.8f;
+// VARIÁVEIS DA LANTERNA
+float flashlightIntensity = 8.0f;
 static int nextSequenceCheckTime = 0; 
 static int currentStageEndTime = 0;    
 
@@ -31,7 +30,7 @@ enum FlickerStage {
     APAGAO_LONGO 
 };
 static FlickerStage currentStage = NORMAL;
-// -------------------------------
+
 
 static const float PLAYER_RADIUS = 0.2f;
 
@@ -106,7 +105,7 @@ void cameraMouseMotion(int x, int y) {
     return;
   }
 
-  float sensitivity = 0.002f;
+  float sensitivity = 0.001f;
   float dx = (x - lastMouseX) * sensitivity;
   float dy = (lastMouseY - y) * sensitivity;
 
@@ -158,7 +157,7 @@ void cameraUpdate() {
           case PISCA_2_ON: currentStage = PISCA_3_OFF; flashlightIntensity = 0.0f; currentStageEndTime = now + 30 + (rand() % 30); break;
           case PISCA_3_OFF: currentStage = PISCA_3_ON; flashlightIntensity = 0.8f; currentStageEndTime = now + 60 + (rand() % 60); break;
           case PISCA_3_ON: currentStage = APAGAO_LONGO; flashlightIntensity = 0.0f; currentStageEndTime = now + 1500 + (rand() % 2500); break;
-          case APAGAO_LONGO: currentStage = NORMAL; flashlightIntensity = 1.0f; nextSequenceCheckTime = now + 15000 + (rand() % 15000); break;
+          case APAGAO_LONGO: currentStage = NORMAL; flashlightIntensity = 8.0f; nextSequenceCheckTime = now + 15000 + (rand() % 15000); break;
           case PISCA_2_OFF: currentStage = PISCA_2_ON; flashlightIntensity = 1.0f; currentStageEndTime = now + 40; break;
           default: break;
       }
@@ -167,15 +166,15 @@ void cameraUpdate() {
   if (currentStage == NORMAL && now > nextSequenceCheckTime) {
       if ((rand() % 1000) < 8) { 
           currentStage = PISCA_1_OFF;
-          flashlightIntensity = 0.2f; 
+          flashlightIntensity = 8.0f; 
           currentStageEndTime = now + 50 + (rand() % 50); 
       }
       nextSequenceCheckTime = now + 200; 
   }
 
-  float baseSpeed = 4.0f;
-  float sprintSpeed = 7.0f; 
-  float exhaustedSpeed = 3.0f; 
+  float baseSpeed = 7.0f;
+  float sprintSpeed = 11.0f; 
+  float exhaustedSpeed = 4.5f; 
   float speed = baseSpeed;
   
   bool isMoving = (keys['w'] || keys['s'] || keys['a'] || keys['d']);
